@@ -143,7 +143,7 @@ jobs:
         env:
           HCLOUD_TOKEN: ${{ steps.secrets.outputs.infra-exec-hcloud-token }}
         run: |
-          IDs=$(echo ${{ steps.get_snapshots.outputs.snapshot_id }})
+          IDs=$(echo ${{ steps.get_snapshots.outputs.snapshots_id }})
 
           if [ -n "$IDs" ]; then
             for ID in $IDs; do

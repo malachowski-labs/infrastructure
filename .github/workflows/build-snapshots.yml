@@ -61,7 +61,7 @@ jobs:
       - name: Upload schematic
         id: schematic
         run: |
-          ID=$(curl -s -X POST --data-binary @schematic.yaml https://factory.talos.dev/schematic | jq -r '.id')
+          ID=$(curl -s -X POST --data-binary @schematic.yaml https://factory.talos.dev/schematics | jq -r '.id')
           echo "schematic_id=$ID" >> $GITHUB_OUTPUT
 
       - name: Build snapshot

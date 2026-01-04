@@ -134,12 +134,20 @@ jobs:
           HCLOUD_TOKEN: ${{ steps.secrets.outputs.infra-exec-hcloud-token }}
         id: get_snapshots
         run: |
-          snapshot_id=$(hcloud image list -t snapshot -o json | jq '.[] | select(.description | contains("${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}")).id')
-          echo "snapshot_id=$snapshot_id" >> $GITHUB_OUTPUT
+          snapshots_id=$(hcloud image list -t snapshot -o json | jq '.[] | select(.description | contains("${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}")).id')
+          echo "snapshots_id<<EOT >> $GITHUB_OUTPUT
+          echo $snapshots_id >> $GITHUB_OUTPUT
+          echo "EOT" >> $GITHUB_OUTPUT
 
       - name: Delete PR snapshots
         env:
           HCLOUD_TOKEN: ${{ steps.secrets.outputs.infra-exec-hcloud-token }}
         run: |
-          hcloud image delete ${{ steps.get_snapshots.outputs.snapshot_id }}
+          IDs=$(echo ${{ steps.get_snapshots.outputs.snapshot_id }})
 
+          if [ -n "$IDs" ]; then
+            for ID in $IDs; do
+              echo "Deleting snapshot id: $ID"
+              hcloud image delete $ID
+            done
+          fi

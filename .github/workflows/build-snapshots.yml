@@ -49,7 +49,6 @@ jobs:
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GC_INFRA_EXECUTOR_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Fetch secrets
         id: secrets
@@ -89,7 +88,6 @@ jobs:
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GC_INFRA_EXECUTOR_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Fetch secrets
         id: secrets
@@ -115,13 +113,11 @@ jobs:
     steps:
       - name: Setup Hetzner Cloud CLI
         uses: hetznercloud/setup-hcloud@v1
-
-
+        
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GC_INFRA_EXECUTOR_SERVICE_ACCOUNT_EMAIL }}
 
       - name: Fetch secrets
         id: secrets

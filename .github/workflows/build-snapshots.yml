@@ -48,6 +48,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
+          project_id: ${{ vars.GC_PROJECT_ID }}
           workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: Fetch secrets
@@ -87,6 +88,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
+          project_id: ${{ vars.GC_PROJECT_ID }}
           workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: Fetch secrets
@@ -117,6 +119,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
+          project_id: ${{ vars.GC_PROJECT_ID }}
           workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: Fetch secrets

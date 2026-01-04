@@ -72,7 +72,7 @@ jobs:
             upload \
             --image-url "https://factory.talos.dev/image/${{ steps.schematic.outputs.schematic_id }}/${{ env.TALOS_VERSION }}/hcloud-${{ matrix.architecture.talos }}.raw.xz" \
             --architecture "${{ matrix.architecture.server }}" \
-            --description "talos-${{ env.TALOS_VERSION }}-${{ matrix.architecture.talos }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run-attempt }}" \
+            --description "talos-${{ env.TALOS_VERSION }}-${{ matrix.architecture.talos }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}" \
             --compression xz \
             --labels "type=infra,os=talos,version=${{ env.TALOS_VERSION }},arch=${{ matrix.architecture.talos }},build_sha=${{ github.sha }},build_run_id=${{ github.run_id }},build_run_attempt=${{ github.run_attempt }}"
 

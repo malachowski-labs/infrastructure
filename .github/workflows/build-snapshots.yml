@@ -135,7 +135,7 @@ jobs:
         id: get_snapshots
         run: |
           snapshots_id=$(hcloud image list -t snapshot -o json | jq '.[] | select(.description | contains("${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}")).id')
-          echo "snapshots_id<<EOT >> $GITHUB_OUTPUT
+          echo "snapshots_id<<EOT" >> $GITHUB_OUTPUT
           echo $snapshots_id >> $GITHUB_OUTPUT
           echo "EOT" >> $GITHUB_OUTPUT
 

@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      
+
       - name: Setup Hetzner Cloud CLI
         uses: hetznercloud/setup-hcloud@v1
 
@@ -39,7 +39,17 @@ jobs:
           CUTOFF_DATE=$(date -d '7 days ago' --iso-8601=seconds)
           echo "Cutoff date: $CUTOFF_DATE"
 
-          IMAGES=$(hcloud image list --type snapshot --output json | jq -r --arg cutoff "$CUTOFF_DATE" '.[] | select(.created < $cutoff) | .id')
+          # Get all snapshots as JSON
+          ALL_SNAPSHOTS=$(hcloud image list --type snapshot --output json)
+
+          # Get the most recent snapshot ID for each architecture
+          KEEP_IDS=$(echo "$ALL_SNAPSHOTS" | jq -r 'group_by(.architecture) | .[] | max_by(.created) | .id')
+
+          echo "Keeping most recent snapshot for each architecture:"
+          echo "$KEEP_IDS"
+
+          # Get old snapshots to delete (older than cutoff, excluding the ones to keep)
+          IMAGES=$(echo "$ALL_SNAPSHOTS" | jq -r --arg cutoff "$CUTOFF_DATE" --argjson keep "$(echo "$KEEP_IDS" | jq -R . | jq -s .)" '.[] | select(.created < $cutoff) | select([.id | tostring] | inside($keep) | not) | .id')
 
           if [ -n "$IMAGES" ]; then
             for IMAGE_ID in $IMAGES; do
@@ -49,4 +59,3 @@ jobs:
           else
             echo "No old snapshots to delete."
           fi
-

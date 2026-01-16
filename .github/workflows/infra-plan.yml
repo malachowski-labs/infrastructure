@@ -1,0 +1,80 @@
+name: Infrastructure Config Plan
+run-name: infra-plan
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    paths:
+      - "**.tf"
+      - "**.tfvars"
+      - "**.yml"
+      - "**.yaml"
+
+jobs:
+  infra-apply:
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment:
+          - prod
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./tofu/envs/${{ matrix.environment }}
+    concurrency:
+      group: infra-${{ matrix.environment }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GC_INFRA_READER_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Retrieve Secrets from Secret Manager
+        id: secrets
+        uses: google-github-actions/secret-manager@v3
+        with:
+          secrets: |
+            INFRA_READER_GITHUB_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_GITHUB_TOKEN_SECRET_NAME }}
+            INFRA_READER_HCLOUD_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_HCLOUD_TOKEN_SECRET_NAME }}
+            INFRA_READER_CLOUDFLARE_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_CLOUDFLARE_TOKEN_SECRET_NAME }}
+
+      - name: Set Up Open Tofu
+        uses: opentofu/setup-opentofu@v1
+
+      - name: Setup Github Comment
+        uses: shmokmt/actions-setup-github-comment@v2
+        if: ${{ !cancelled() }}
+
+      - name: Setup Terraform Commenter
+        uses: shmokmt/actions-setup-tfcmt@v2
+
+      - name: Initialize Open Tofu
+        run: tofu init -input=false
+
+      - name: Generate Open Tofu Plan
+        id: plan
+        env:
+          TF_VAR_hcloud_token: ${{ steps.secrets.outputs.INFRA_READER_HCLOUD_TOKEN }}
+          TF_VAR_cloudflare_token: ${{ steps.secrets.outputs.INFRA_READER_CLOUDFLARE_TOKEN }}
+          TF_VAR_github_token: ${{ steps.secrets.outputs.INFRA_READER_GITHUB_TOKEN }}
+        run: tfcmt -owner ${{ github.repository_owner }} -repo ${{ github.event.repository.name }} -pr ${{ github.event.pull_request.number }} -sha ${{ github.event.pull_request.head.sha || github.event.merge_group.head.sha }} plan -- tofu plan -input=false -no-color -lock-timeout=300s
+
+      - name: Hide GitHub comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: github-comment hide --org ${{ github.repository_owner }} --repo ${{ github.event.repository.name }} -pr ${{ github.event.pull_request.number }} -sha1 ${{ github.event.pull_request.head.sha }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request_target' }}

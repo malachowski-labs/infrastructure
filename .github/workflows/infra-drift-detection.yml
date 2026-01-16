@@ -1,0 +1,176 @@
+name: Infrastructure Config Drift Detection
+run-name: infra-drift-detection
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  infra-drift-detection:
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment:
+          - prod
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./tofu/envs/${{ matrix.environment }}
+    concurrency:
+      group: infra-${{ matrix.environment }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GC_INFRA_READER_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Retrieve Secrets from Secret Manager
+        id: secrets
+        uses: google-github-actions/secret-manager@v3
+        with:
+          secrets: |
+            INFRA_READER_GITHUB_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_GITHUB_TOKEN_SECRET_NAME }}
+            INFRA_READER_HCLOUD_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_HCLOUD_TOKEN_SECRET_NAME }}
+            INFRA_READER_CLOUDFLARE_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_CLOUDFLARE_TOKEN_SECRET_NAME }}
+
+      - name: Set Up Open Tofu
+        uses: opentofu/setup-opentofu@v1
+
+      - name: Initialize Open Tofu
+        run: tofu init -input=false
+
+      - name: Plan Open Tofu
+        id: plan
+        env:
+          TF_VAR_github_token: ${{ steps.secrets.outputs.INFRA_READER_GITHUB_TOKEN }}
+          TF_VAR_hetzner_token: ${{ steps.secrets.outputs.INFRA_READER_HCLOUD_TOKEN }}
+          TF_VAR_cloudflare_token: ${{ steps.secrets.outputs.INFRA_READER_CLOUDFLARE_TOKEN }}
+        run: |
+          exitcode=0
+          tofu plan -detailed-exitcode -no-color -out plan || exitcode=$?
+
+          echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
+
+          if [ $exitcode -eq 1 ]; then
+            echo "Error: Open Tofu plan failed"
+            exit 1
+          fi
+
+      - name: Create GitHub Comment Body
+        id: comment-body
+        run: |
+          delim="$(openssl rand -hex 8)"
+          {
+            echo "summary<<${delim}"
+            echo "## :warning: Infrastructure Drift Detected in \`${{ matrix.environment }}\` Environment"
+            echo ""
+            echo ""
+            echo "### :information_source: Plan Details"
+            echo "<details><summary>Click to show plan output</summary>"
+            echo ""
+            echo '```terraform'
+            tofu show -no-color plan
+            echo '```'
+            echo "</details>"
+            echo ""
+            echo "### :warning: Action Required"
+            echo "Please review the above plan and take necessary actions to reconcile the infrastructure state."
+            echo " - Aplly the changes to match the infrastructure configuration."
+            echo " - Update the configuration to match the current infrastructure state if the changes are intentional."
+            echo ""
+            echo "[View Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo "${delim}"
+          } >> $GITHUB_OUTPUT
+
+      - name: Add plan to task summary
+        env:
+          SUMMARY: ${{ steps.comment-body.outputs.summary }}
+        run: echo "${SUMMARY}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Publish Drift Report
+        if: steps.plan.outputs.exitcode == 2
+        uses: actions/github-script@v8
+        env:
+          SUMMARY: ${{ steps.comment-body.outputs.summary }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = `${process.env.SUMMARY}`;
+            const title = `:warning: Infrastructure Drift Detected in '${{ matrix.environment }}' Environment`;
+            const creator = `github-actions[bot]`;
+
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              title: title,
+            });
+
+            if (issues.data.length > 0) {
+              const issue = issues.data[0];
+
+              if (issue.body == body) {
+                console.log('Drift Detected: Found matching issue with duplicate body. No new issue created.');
+                return;
+              }
+
+              console.log(`Drift Detected: Updating existing issue #${issue.number}`);
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: body,
+              });
+
+              return;
+            }
+
+            console.log('Drift Detected: Creating new issue');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+            });
+
+      - name: Close issues when drift is not detected
+        if: steps.plan.outputs.exitcode == 0
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const title = `:warning: Infrastructure Drift Detected in '${{ matrix.environment }}' Environment`;
+
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              title: title,
+            });
+
+            if (issues.data.length === 0) {
+              console.log('No open drift issues found. No action needed.');
+              return;
+            }
+
+            for (const issue of issues.data) {
+              console.log(`Closing drift issue #${issue.number} as no drift is detected.`);
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+              });
+            }

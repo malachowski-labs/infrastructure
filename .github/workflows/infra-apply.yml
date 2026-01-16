@@ -43,12 +43,12 @@ jobs:
 
       - name: Retrieve Secrets from Secret Manager
         id: secrets
-        uses: google-github-actions/secret-manager@v3
+        uses: google-github-actions/get-secretmanager-secrets@v3
         with:
           secrets: |
-            INFRA_EXECUTOR_GITHUB_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_EXECUTOR_GITHUB_TOKEN_SECRET_NAME }}
-            INFRA_EXECUTOR_HCLOUD_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_EXECUTOR_HCLOUD_TOKEN_SECRET_NAME }}
-            INFRA_EXECUTOR_CLOUDFLARE_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_EXECUTOR_CLOUDFLARE_TOKEN_SECRET_NAME }}
+            INFRA_EXECUTOR_GITHUB_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_EXECUTOR_GITHUB_TOKEN_SECRET_NAME }}
+            INFRA_EXECUTOR_HCLOUD_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_EXECUTOR_HCLOUD_TOKEN_SECRET_NAME }}
+            INFRA_EXECUTOR_CLOUDFLARE_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_EXECUTOR_CLOUDFLARE_TOKEN_SECRET_NAME }}
 
       - name: Set Up Open Tofu
         uses: opentofu/setup-opentofu@v1
@@ -68,4 +68,3 @@ jobs:
           TF_VAR_hcloud_token: ${{ steps.secrets.outputs.INFRA_EXECUTOR_HCLOUD_TOKEN }}
           TF_VAR_cloudflare_token: ${{ steps.secrets.outputs.INFRA_EXECUTOR_CLOUDFLARE_TOKEN }}
         run: tfcmt -owner ${{ github.repository_owner }} -repo ${{ github.event.repository.name }} -sha ${{ github.sha }} -- tofu apply -input=false -no-color -auto-approve
-

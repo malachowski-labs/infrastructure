@@ -68,6 +68,7 @@ jobs:
       - name: Generate Open Tofu Plan
         id: plan
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TF_VAR_hcloud_token: ${{ steps.secrets.outputs.INFRA_READER_HCLOUD_TOKEN }}
           TF_VAR_cloudflare_token: ${{ steps.secrets.outputs.INFRA_READER_CLOUDFLARE_TOKEN }}
           TF_VAR_github_token: ${{ steps.secrets.outputs.INFRA_READER_GITHUB_TOKEN }}

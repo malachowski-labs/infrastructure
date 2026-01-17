@@ -50,6 +50,7 @@ jobs:
             repository_id: .repository_id,
             repository_owner: .repository_owner,
             workflow: .workflow,
+            run_id: .run_id,
             runner_environment: .runner_environment,
             ref: .ref
           }'

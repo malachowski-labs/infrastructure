@@ -56,8 +56,6 @@ jobs:
 
       - name: Setup Terraform Commenter
         uses: shmokmt/actions-setup-tfcmt@v2
-        with:
-          version: v4.7.1
 
       - name: Initialize Open Tofu
         run: tofu init -input=false
@@ -70,4 +68,4 @@ jobs:
           TF_VAR_github_token: ${{ steps.secrets.outputs.INFRA_EXECUTOR_GITHUB_TOKEN }}
           TF_VAR_hcloud_token: ${{ steps.secrets.outputs.INFRA_EXECUTOR_HCLOUD_TOKEN }}
           TF_VAR_cloudflare_token: ${{ steps.secrets.outputs.INFRA_EXECUTOR_CLOUDFLARE_TOKEN }}
-        run: tfcmt -owner ${{ github.repository_owner }} -repo ${{ github.event.repository.name }} -sha ${{ github.sha }} -- tofu apply -input=false -no-color -auto-approve
+        run: tfcmt -owner ${{ github.repository_owner }} -repo ${{ github.event.repository.name }} -sha ${{ github.sha }} apply -- tofu apply -input=false -no-color -auto-approve

@@ -1,5 +1,5 @@
-name: Infrastructure Config Plan
-run-name: infra-plan
+run-name: Infrastructure Config Plan
+name: infra-plan
 
 on:
   pull_request_target:
@@ -61,8 +61,6 @@ jobs:
 
       - name: Setup Terraform Commenter
         uses: shmokmt/actions-setup-tfcmt@v2
-        with:
-          version: v4.7.1
 
       - name: Initialize Open Tofu
         run: tofu init -input=false

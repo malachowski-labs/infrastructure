@@ -2,6 +2,7 @@ name: Infrastructure Config Apply
 run-name: infra-apply
 
 on:
+  workflow_dispatch: 
   push:
     branches:
       - main
@@ -40,6 +41,18 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GC_INFRA_EXECUTOR_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Debug OIDC Claims (Safe)
+        run: |
+          TOKEN=$(curl -H "Authorization:  bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r '.value')
+          echo "$TOKEN" | cut -d'.' -f2 | base64 -d 2>/dev/null | jq '{
+            repository:  .repository,
+            repository_id: .repository_id,
+            repository_owner: .repository_owner,
+            workflow: .workflow,
+            runner_environment: .runner_environment,
+            ref: .ref
+          }'
 
       - name: Retrieve Secrets from Secret Manager
         id: secrets

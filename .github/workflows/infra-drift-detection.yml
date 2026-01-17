@@ -1,5 +1,5 @@
-name: Infrastructure Config Drift Detection
-run-name: infra-drift-detection
+run-name: Infrastructure Config Drift Detection
+name: infra-drift-detection
 
 on:
   schedule:

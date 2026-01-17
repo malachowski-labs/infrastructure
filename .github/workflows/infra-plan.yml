@@ -1,5 +1,5 @@
-name: Infrastructure Config Plan
-run-name: infra-plan
+run-name: Infrastructure Config Plan
+name: infra-plan
 
 on:
   pull_request_target:

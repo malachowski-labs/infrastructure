@@ -1,8 +1,8 @@
-name: Infrastructure Config Apply
-run-name: infra-apply
+run-name: Infrastructure Update
+name: infra-apply
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
   push:
     branches:
       - main

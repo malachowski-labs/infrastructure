@@ -6,8 +6,8 @@ locals {
 }
 
 module "talos" {
-  source = "github.com/malachowski-labs/terraform-hcloud-talos?ref=main"
-
+  source = "hcloud-talos/talos/hcloud"
+  version = "v2.23.1"
   hcloud_token = var.hcloud_token
 
   talos_version = "v1.11.0"

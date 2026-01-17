@@ -56,6 +56,8 @@ jobs:
 
       - name: Setup Terraform Commenter
         uses: shmokmt/actions-setup-tfcmt@v2
+        with:
+          version: v4.14.2
 
       - name: Initialize Open Tofu
         run: tofu init -input=false

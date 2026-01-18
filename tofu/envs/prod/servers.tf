@@ -23,3 +23,18 @@ module "talos" {
 
   disable_arm = true
 }
+
+resource "hcloud_load_balancer" "this" {
+  name = "prod-malachowski-me-lb"
+  load_balancer_type = "lb11"
+  location = "hel1"
+}
+
+resource "hcloud_load_balancer_target" "this" {
+  type = "label_selector"
+  load_balancer_id = hcloud_load_balancer.this.id
+  label_selector = "role=control-plane"
+  use_private_ip = true
+}
+
+

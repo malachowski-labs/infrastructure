@@ -30,7 +30,7 @@ data "kubernetes_secret_v1" "argo_cluser_password" {
   depends_on = [ helm_release.argocd  ]
 
   metadata {
-    name      = "argo-initial-admin-secret"
+    name      = "argocd-initial-admin-secret"
     namespace = "argocd"
   }
 }

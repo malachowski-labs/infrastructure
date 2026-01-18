@@ -55,7 +55,7 @@ jobs:
       - name: Set Up Open Tofu
         uses: opentofu/setup-opentofu@v1
         with:
-          tofu-version: "v1.10.5"
+          tofu_version: 1.10.5
 
       - name: Setup Github Comment
         uses: shmokmt/actions-setup-github-comment@v2

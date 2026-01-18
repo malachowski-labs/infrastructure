@@ -2,9 +2,21 @@ data "google_secret_manager_secret_version" "argocd_app_pem_key" {
   secret = "argocd-gh-app-pem-key"
 }
 
+resource "kubernetes_namespace_v1" "argocd" {
+  depends_on = [ module.talos ]
+
+  metadata {
+    name = "argocd"
+
+    labels = {
+      name = "argocd"
+      "pod-security.kubernetes.io/enforce" = "privileged"
+    }
+  }
+}
 
 resource "helm_release" "argocd" {
-  depends_on = [module.talos]
+  depends_on = [module.talos, kubernetes_namespace_v1.argocd]
   name       = "argocd"
 
   repository = "https://argoproj.github.io/argo-helm"
@@ -15,7 +27,7 @@ resource "helm_release" "argocd" {
 }
 
 resource "kubernetes_secret_v1" "argocd_repo_access" {
-  depends_on = [module.talos, helm_release.argocd]
+  depends_on = [module.talos, helm_release.argocd, kubernetes_namespace_v1.argocd ]
   metadata {
     name = "argo-private-repo-secret"
 
@@ -34,7 +46,7 @@ resource "kubernetes_secret_v1" "argocd_repo_access" {
 }
 
 resource "argocd_application" "cluster_config" {
-  depends_on = [ kubernetes_secret_v1.argocd_repo_access, helm_release.argocd ]
+  depends_on = [ kubernetes_secret_v1.argocd_repo_access, helm_release.argocd, kubernetes_namespace_v1.argocd ]
 
   metadata {
     name      = "cluster-config"
@@ -73,7 +85,7 @@ resource "argocd_application" "cluster_config" {
 }
 
 resource "argocd_application" "traefik" {
-  depends_on = [ helm_release.argocd ]
+  depends_on = [ helm_release.argocd, kubernetes_namespace_v1.argocd, hcloud_load_balancer.this ]
 
   metadata {
     name = "argo-traefik-chart"

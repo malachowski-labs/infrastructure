@@ -18,6 +18,7 @@ resource "kubernetes_namespace_v1" "argocd" {
 resource "helm_release" "argocd" {
   depends_on = [module.talos, kubernetes_namespace_v1.argocd]
   name       = "argocd"
+  namespace = kubernetes_namespace_v1.argocd.metadata[0].name
 
   repository = "https://argoproj.github.io/argo-helm"
   chart      = "argo-cd"
@@ -30,6 +31,7 @@ resource "kubernetes_secret_v1" "argocd_repo_access" {
   depends_on = [module.talos, helm_release.argocd, kubernetes_namespace_v1.argocd ]
   metadata {
     name = "argo-private-repo-secret"
+    namespace = kubernetes_namespace_v1.argocd.metadata[0].name
 
     labels = {
       "argocd.argoproj.io/secret-type" = "repo-creds"
@@ -50,7 +52,7 @@ resource "argocd_application" "cluster_config" {
 
   metadata {
     name      = "cluster-config"
-    namespace = "argocd"
+    namespace = kubernetes_namespace_v1.argocd.metadata[0].name
   }
 
   wait = true
@@ -89,6 +91,7 @@ resource "argocd_application" "traefik" {
 
   metadata {
     name = "argo-traefik-chart"
+    namespace = kubernetes_namespace_v1.argocd.metadata[0].name
   }
 
   wait = true

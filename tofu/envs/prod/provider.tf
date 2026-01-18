@@ -31,7 +31,7 @@ data "kubernetes_secret_v1" "argo_cluser_password" {
 
   metadata {
     name      = "argocd-initial-admin-secret"
-    namespace = "argocd"
+    namespace = kubernetes_namespace_v1.argocd.metadata[0].name
   }
 }
 

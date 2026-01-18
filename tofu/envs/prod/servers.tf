@@ -30,7 +30,14 @@ resource "hcloud_load_balancer" "this" {
   location = "hel1"
 }
 
+resource "hcloud_load_balancer_network" "this" {
+  load_balancer_id = hcloud_load_balancer.this.id
+  network_id = module.talos.hetzner_network_id
+}
+
 resource "hcloud_load_balancer_target" "this" {
+  depends_on = [ hcloud_load_balancer_network.this ]
+
   type = "label_selector"
   load_balancer_id = hcloud_load_balancer.this.id
   label_selector = "role=control-plane"

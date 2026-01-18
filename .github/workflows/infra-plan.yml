@@ -12,7 +12,7 @@ on:
       - "**.yaml"
 
 jobs:
-  infra-apply:
+  infra-plan:
     permissions:
       contents: read
       id-token: write
@@ -54,6 +54,8 @@ jobs:
 
       - name: Set Up Open Tofu
         uses: opentofu/setup-opentofu@v1
+        with:
+          version: "v1.10.5"
 
       - name: Setup Github Comment
         uses: shmokmt/actions-setup-github-comment@v2

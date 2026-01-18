@@ -47,6 +47,8 @@ jobs:
 
       - name: Set Up Open Tofu
         uses: opentofu/setup-opentofu@v1
+        with:
+          version: "v1.10.5"
 
       - name: Initialize Open Tofu
         run: tofu init -input=false

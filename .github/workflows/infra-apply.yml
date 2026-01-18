@@ -54,7 +54,7 @@ jobs:
       - name: Set Up Open Tofu
         uses: opentofu/setup-opentofu@v1
         with:
-          version: "v1.10.5"
+          tofu-version: "v1.10.5"
 
       - name: Setup Terraform Commenter
         uses: shmokmt/actions-setup-tfcmt@v2

@@ -41,9 +41,9 @@ jobs:
         uses: google-github-actions/get-secretmanager-secrets@v3
         with:
           secrets: |
-            INFRA_READER_GITHUB_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_GITHUB_TOKEN_SECRET_NAME }}
-            INFRA_READER_HCLOUD_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_HCLOUD_TOKEN_SECRET_NAME }}
-            INFRA_READER_CLOUDFLARE_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.NFRA_READER_CLOUDFLARE_TOKEN_SECRET_NAME }}
+            INFRA_READER_GITHUB_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_READER_GITHUB_TOKEN_SECRET_NAME }}
+            INFRA_READER_HCLOUD_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_READER_HCLOUD_TOKEN_SECRET_NAME }}
+            INFRA_READER_CLOUDFLARE_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_READER_CLOUDFLARE_TOKEN_SECRET_NAME }}
 
       - name: Set Up Open Tofu
         uses: opentofu/setup-opentofu@v1

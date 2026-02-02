@@ -357,7 +357,7 @@ resource "helm_release" "external_secrets" {
   namespace  = local.eso_namespace
   repository = "https://charts.external-secrets.io"
   chart      = "external-secrets"
-  version    = "0.10.9"
+  version    = "1.3.1"
 
   values = [
     yamlencode({

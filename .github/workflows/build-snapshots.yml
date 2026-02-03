@@ -39,7 +39,7 @@ jobs:
           - talos: amd64
             server: cx33
           - talos: arm64
-            server: cax11
+            server: cax21
 
     steps:
       - name: Checkout repository

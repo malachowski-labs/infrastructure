@@ -27,7 +27,7 @@ resource "google_project_iam_member" "external_secrets_secret_accessor" {
 
 resource "google_iam_workload_identity_pool" "kubernetes" {
   workload_identity_pool_id = "kubernetes-pool"
-  display_name              = "Kubernetes Workload Identity Pool"
+  display_name              = "Kubernetes Workload Identity"
   description               = "Workload Identity Pool for Kubernetes cluster"
   disabled                  = false
 }
@@ -376,10 +376,10 @@ resource "helm_release" "external_secrets" {
 # Secret Store Configuration
 # =====================================
 
-resource "kubernetes_manifest" "secret_store_gcp" {
+resource "kubectl_manifest" "secret_store_gcp" {
   depends_on = [helm_release.external_secrets, module.talos]
 
-  manifest = {
+  yaml_body = yamlencode({
     apiVersion = "external-secrets.io/v1beta1"
     kind       = "ClusterSecretStore"
     metadata = {
@@ -402,5 +402,5 @@ resource "kubernetes_manifest" "secret_store_gcp" {
         }
       }
     }
-  }
+  })
 }

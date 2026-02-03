@@ -3,20 +3,39 @@ locals {
     "0.0.0.0/0",
     "::/0"
   ]
+
+  control_plane_nodes = [
+    for i in range(0, 3) : {
+      id     = i + 1
+      name   = "prod-malachowski-me-cp-${i}"
+      labels = { role = "control-plane" }
+      type   = "cx33"
+    }
+  ]
+
+  workers_nodes = [
+    for i in range(0, 0) : {
+      id     = i + 1
+      name   = "prod-malachowski-me-w-${i}"
+      labels = { role = "worker" }
+      type   = "cpx22"
+    }
+  ]
 }
 
 module "talos" {
   source       = "hcloud-talos/talos/hcloud"
-  version      = "v2.23.1"
+  version      = "v3.0.0-next.1"
   hcloud_token = var.hcloud_token
 
-  talos_version = "v1.11.0"
+  talos_version      = "v1.12.0"
+  kubernetes_version = "v1.35.0"
 
-  cluster_name    = "prod.malachowski.me"
-  datacenter_name = "hel1-dc2"
+  cluster_name  = "prod.malachowski.me"
+  location_name = "hel1"
 
-  control_plane_count       = 1
-  control_plane_server_type = "cx23"
+  control_plane_nodes = local.control_plane_nodes
+  worker_nodes        = local.workers_nodes
 
   firewall_kube_api_source  = local.any_api_source
   firewall_talos_api_source = local.any_api_source
@@ -28,6 +47,8 @@ module "talos" {
     "service-account-jwks-uri" = "https://oidc.malachowski.me/openid/v1/jwks"
     "api-audiences"            = "https://oidc.malachowski.me"
   }
+
+  control_plane_allow_schedule = true
 }
 
 resource "hcloud_load_balancer" "this" {

@@ -26,6 +26,14 @@ provider "helm" {
   }
 }
 
+provider "kubectl" {
+  host                   = module.talos.kubeconfig_data.host
+  client_certificate     = module.talos.kubeconfig_data.client_certificate
+  client_key             = module.talos.kubeconfig_data.client_key
+  cluster_ca_certificate = module.talos.kubeconfig_data.cluster_ca_certificate
+  load_config_file       = false
+}
+
 data "kubernetes_secret_v1" "argo_cluser_password" {
   depends_on = [helm_release.argocd]
 

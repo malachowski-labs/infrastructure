@@ -7,7 +7,7 @@ locals {
 
 module "talos" {
   source       = "hcloud-talos/talos/hcloud"
-  version      = "v2.23.1"
+  version      = "v2.25.4"
   hcloud_token = var.hcloud_token
 
   talos_version = "v1.11.0"

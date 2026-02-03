@@ -49,6 +49,8 @@ module "talos" {
   }
 
   control_plane_allow_schedule = true
+  kubeconfig_endpoint_mode     = "public_endpoint"
+  cluster_api_host             = hcloud_load_balancer.this.ipv4
 }
 
 resource "hcloud_load_balancer" "this" {

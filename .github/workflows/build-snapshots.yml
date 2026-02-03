@@ -37,9 +37,9 @@ jobs:
       matrix:
         architecture:
           - talos: amd64
-            server: CX33
+            server: cx33
           - talos: arm64
-            server: CAX11
+            server: cax11
 
     steps:
       - name: Checkout repository

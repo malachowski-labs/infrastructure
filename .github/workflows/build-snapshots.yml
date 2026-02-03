@@ -37,9 +37,9 @@ jobs:
       matrix:
         architecture:
           - talos: amd64
-            server: x86
+            server: CX33
           - talos: arm64
-            server: arm
+            server: CAX11
 
     steps:
       - name: Checkout repository
@@ -71,11 +71,10 @@ jobs:
             ghcr.io/apricote/hcloud-upload-image:v1.2.0 \
             upload \
             --image-url "https://factory.talos.dev/image/${{ steps.schematic.outputs.schematic_id }}/${{ env.TALOS_VERSION }}/hcloud-${{ matrix.architecture.talos }}.raw.xz" \
-            --architecture "${{ matrix.architecture.server }}" \
+            --server-type "${{ matrix.architecture.server }}" \
             --description "talos-${{ env.TALOS_VERSION }}-${{ matrix.architecture.talos }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}" \
             --compression xz \
             --labels "type=infra,os=talos,version=${{ env.TALOS_VERSION }},arch=${{ matrix.architecture.talos }},build_sha=${{ github.sha }},build_run_id=${{ github.run_id }},build_run_attempt=${{ github.run_attempt }}"
-
 
   cleanup-on-fail:
     runs-on: ubuntu-latest
@@ -115,7 +114,7 @@ jobs:
     steps:
       - name: Setup Hetzner Cloud CLI
         uses: hetznercloud/setup-hcloud@v1
-        
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:

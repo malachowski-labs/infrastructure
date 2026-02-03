@@ -69,7 +69,7 @@ resource "google_service_account_iam_member" "workload_identity_binding" {
 
 # Namespace for OIDC discovery service
 resource "kubernetes_namespace_v1" "oidc_discovery" {
-  depends_on = [module.talos]
+  depends_on = [module.talos, hcloud_load_balancer_service.this]
 
   metadata {
     name = "oidc-discovery"
@@ -320,7 +320,7 @@ resource "kubernetes_ingress_v1" "oidc_discovery" {
 # =====================================
 
 resource "kubernetes_namespace_v1" "external_secrets" {
-  depends_on = [module.talos]
+  depends_on = [module.talos, hcloud_load_balancer_service.this]
 
   metadata {
     name = local.eso_namespace
@@ -352,7 +352,8 @@ resource "helm_release" "external_secrets" {
   depends_on = [
     kubernetes_namespace_v1.external_secrets,
     kubernetes_service_account_v1.external_secrets,
-    module.talos
+    module.talos,
+    hcloud_load_balancer_service.this
   ]
 
   name       = "external-secrets"

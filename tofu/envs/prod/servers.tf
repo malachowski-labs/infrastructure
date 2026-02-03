@@ -5,7 +5,7 @@ locals {
   ]
 
   control_plane_nodes = [
-    for i in range(0, 3) : {
+    for i in range(0, 1) : {
       id     = i + 1
       name   = "prod-malachowski-me-cp-${i}"
       labels = { role = "control-plane" }
@@ -71,6 +71,13 @@ resource "hcloud_load_balancer_target" "this" {
   load_balancer_id = hcloud_load_balancer.this.id
   label_selector   = "role=control-plane"
   use_private_ip   = true
+}
+
+resource "hcloud_load_balancer_service" "this" {
+  load_balancer_id = hcloud_load_balancer.this.id
+  protocol         = "tcp"
+  listen_port      = 6443
+  destination_port = 6443
 }
 
 

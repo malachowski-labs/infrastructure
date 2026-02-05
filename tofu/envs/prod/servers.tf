@@ -74,6 +74,8 @@ resource "hcloud_load_balancer_target" "this" {
 }
 
 resource "hcloud_load_balancer_service" "this" {
+  depends_on = [ hcloud_load_balancer_service.this ]
+
   load_balancer_id = hcloud_load_balancer.this.id
   protocol         = "tcp"
   listen_port      = 6443

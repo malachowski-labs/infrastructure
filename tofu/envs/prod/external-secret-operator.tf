@@ -26,7 +26,7 @@ resource "google_project_iam_member" "external_secrets_secret_accessor" {
 # =====================================
 
 resource "google_iam_workload_identity_pool" "kubernetes" {
-  workload_identity_pool_id = "kubernetes-pool"
+  workload_identity_pool_id = "malachowski-kubernetes"
   display_name              = "Kubernetes Workload Identity"
   description               = "Workload Identity Pool for Kubernetes cluster"
   disabled                  = false
@@ -355,6 +355,8 @@ resource "helm_release" "external_secrets" {
     module.talos,
     hcloud_load_balancer_service.this
   ]
+
+  wait = true
 
   name       = "external-secrets"
   namespace  = local.eso_namespace

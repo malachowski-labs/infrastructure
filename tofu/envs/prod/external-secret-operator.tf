@@ -82,7 +82,7 @@ resource "kubernetes_namespace_v1" "oidc_discovery" {
 
 # ConfigMap with OIDC discovery configuration
 resource "kubernetes_config_map_v1" "oidc_discovery" {
-  depends_on = [kubernetes_namespace_v1.oidc_discovery]
+  depends_on = [kubernetes_namespace_v1.oidc_discovery, hcloud_load_balancer_service.this]
 
   metadata {
     name      = "oidc-discovery"
@@ -105,7 +105,8 @@ resource "kubernetes_deployment_v1" "oidc_discovery" {
   depends_on = [
     kubernetes_namespace_v1.oidc_discovery,
     kubernetes_config_map_v1.oidc_discovery,
-    module.talos
+    module.talos,
+    hcloud_load_balancer_service.this
   ]
 
   metadata {
@@ -206,7 +207,11 @@ resource "kubernetes_deployment_v1" "oidc_discovery" {
 
 # Nginx config to proxy JWKS from API server
 resource "kubernetes_config_map_v1" "oidc_nginx_config" {
-  depends_on = [kubernetes_namespace_v1.oidc_discovery, module.talos]
+  depends_on = [
+    kubernetes_namespace_v1.oidc_discovery,
+    module.talos,
+    hcloud_load_balancer_service.this
+  ]
 
   metadata {
     name      = "oidc-nginx-config"
@@ -243,7 +248,11 @@ resource "kubernetes_config_map_v1" "oidc_nginx_config" {
 
 # Service for OIDC discovery
 resource "kubernetes_service_v1" "oidc_discovery" {
-  depends_on = [kubernetes_deployment_v1.oidc_discovery, module.talos]
+  depends_on = [
+    kubernetes_deployment_v1.oidc_discovery,
+    module.talos,
+    hcloud_load_balancer_service.this
+  ]
 
   metadata {
     name      = "oidc-discovery"
@@ -272,7 +281,7 @@ resource "kubernetes_service_v1" "oidc_discovery" {
 
 # Ingress for OIDC discovery (exposed publicly)
 resource "kubernetes_ingress_v1" "oidc_discovery" {
-  depends_on = [kubernetes_service_v1.oidc_discovery, module.talos]
+  depends_on = [kubernetes_service_v1.oidc_discovery, module.talos, hcloud_load_balancer_service.this]
 
   metadata {
     name      = "oidc-discovery"
@@ -332,7 +341,7 @@ resource "kubernetes_namespace_v1" "external_secrets" {
 }
 
 resource "kubernetes_service_account_v1" "external_secrets" {
-  depends_on = [kubernetes_namespace_v1.external_secrets, module.talos]
+  depends_on = [kubernetes_namespace_v1.external_secrets, module.talos, hcloud_load_balancer_service.this]
 
   metadata {
     name      = local.eso_sa_name
@@ -378,7 +387,7 @@ resource "helm_release" "external_secrets" {
 # =====================================
 
 resource "kubectl_manifest" "secret_store_gcp" {
-  depends_on = [helm_release.external_secrets, module.talos]
+  depends_on = [helm_release.external_secrets, module.talos, hcloud_load_balancer_service.this]
 
   yaml_body = yamlencode({
     apiVersion = "external-secrets.io/v1beta1"

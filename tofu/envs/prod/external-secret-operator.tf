@@ -26,10 +26,15 @@ resource "google_project_iam_member" "external_secrets_secret_accessor" {
 # =====================================
 
 resource "google_iam_workload_identity_pool" "kubernetes" {
-  workload_identity_pool_id = "kubernetes-pool"
+  workload_identity_pool_id = "kubernetes"
   display_name              = "Kubernetes Workload Identity"
   description               = "Workload Identity Pool for Kubernetes cluster"
   disabled                  = false
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
 }
 
 resource "google_iam_workload_identity_pool_provider" "kubernetes_oidc" {
@@ -50,6 +55,10 @@ resource "google_iam_workload_identity_pool_provider" "kubernetes_oidc" {
 
   oidc {
     issuer_uri = local.cluster_issuer_url
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -390,7 +399,7 @@ resource "kubectl_manifest" "secret_store_gcp" {
   depends_on = [helm_release.external_secrets, module.talos, hcloud_load_balancer_service.this]
 
   yaml_body = yamlencode({
-    apiVersion = "external-secrets.io/v1beta1"
+    apiVersion = "external-secrets.io/v1"
     kind       = "ClusterSecretStore"
     metadata = {
       name = "gcpsm-secret-store"

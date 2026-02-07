@@ -50,6 +50,8 @@ module "talos" {
   }
 
   control_plane_allow_schedule = true
+
+  enable_floating_ip = true
 }
 
 resource "hcloud_load_balancer" "this" {

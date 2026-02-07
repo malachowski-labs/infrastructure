@@ -78,7 +78,7 @@ resource "google_service_account_iam_member" "workload_identity_binding" {
 
 # Namespace for OIDC discovery service
 resource "kubernetes_namespace_v1" "oidc_discovery" {
-  depends_on = [module.talos, hcloud_load_balancer_service.this]
+  depends_on = [module.talos]
 
   metadata {
     name = "oidc-discovery"
@@ -91,7 +91,7 @@ resource "kubernetes_namespace_v1" "oidc_discovery" {
 
 # ConfigMap with OIDC discovery configuration
 resource "kubernetes_config_map_v1" "oidc_discovery" {
-  depends_on = [kubernetes_namespace_v1.oidc_discovery, hcloud_load_balancer_service.this]
+  depends_on = [kubernetes_namespace_v1.oidc_discovery]
 
   metadata {
     name      = "oidc-discovery"
@@ -114,8 +114,7 @@ resource "kubernetes_deployment_v1" "oidc_discovery" {
   depends_on = [
     kubernetes_namespace_v1.oidc_discovery,
     kubernetes_config_map_v1.oidc_discovery,
-    module.talos,
-    hcloud_load_balancer_service.this
+    module.talos
   ]
 
   metadata {
@@ -218,8 +217,7 @@ resource "kubernetes_deployment_v1" "oidc_discovery" {
 resource "kubernetes_config_map_v1" "oidc_nginx_config" {
   depends_on = [
     kubernetes_namespace_v1.oidc_discovery,
-    module.talos,
-    hcloud_load_balancer_service.this
+    module.talos
   ]
 
   metadata {
@@ -259,8 +257,7 @@ resource "kubernetes_config_map_v1" "oidc_nginx_config" {
 resource "kubernetes_service_v1" "oidc_discovery" {
   depends_on = [
     kubernetes_deployment_v1.oidc_discovery,
-    module.talos,
-    hcloud_load_balancer_service.this
+    module.talos
   ]
 
   metadata {
@@ -290,7 +287,7 @@ resource "kubernetes_service_v1" "oidc_discovery" {
 
 # Ingress for OIDC discovery (exposed publicly)
 resource "kubernetes_ingress_v1" "oidc_discovery" {
-  depends_on = [kubernetes_service_v1.oidc_discovery, module.talos, hcloud_load_balancer_service.this]
+  depends_on = [kubernetes_service_v1.oidc_discovery, module.talos]
 
   metadata {
     name      = "oidc-discovery"
@@ -343,7 +340,7 @@ resource "kubernetes_ingress_v1" "oidc_discovery" {
 
 # ClusterRoleBinding to allow anonymous users to access JWKS
 resource "kubernetes_cluster_role_binding_v1" "oidc_jwks_anonymous" {
-  depends_on = [module.talos, hcloud_load_balancer_service.this]
+  depends_on = [module.talos]
 
   metadata {
     name = "system:service-account-issuer-discovery-anonymous"
@@ -367,7 +364,7 @@ resource "kubernetes_cluster_role_binding_v1" "oidc_jwks_anonymous" {
 # =====================================
 
 resource "kubernetes_namespace_v1" "external_secrets" {
-  depends_on = [module.talos, hcloud_load_balancer_service.this]
+  depends_on = [module.talos]
 
   metadata {
     name = local.eso_namespace
@@ -379,7 +376,7 @@ resource "kubernetes_namespace_v1" "external_secrets" {
 }
 
 resource "kubernetes_service_account_v1" "external_secrets" {
-  depends_on = [kubernetes_namespace_v1.external_secrets, module.talos, hcloud_load_balancer_service.this]
+  depends_on = [kubernetes_namespace_v1.external_secrets, module.talos]
 
   metadata {
     name      = local.eso_sa_name
@@ -399,8 +396,7 @@ resource "helm_release" "external_secrets" {
   depends_on = [
     kubernetes_namespace_v1.external_secrets,
     kubernetes_service_account_v1.external_secrets,
-    module.talos,
-    hcloud_load_balancer_service.this
+    module.talos
   ]
 
   name       = "external-secrets"
@@ -425,7 +421,7 @@ resource "helm_release" "external_secrets" {
 # =====================================
 
 resource "kubectl_manifest" "secret_store_gcp" {
-  depends_on = [helm_release.external_secrets, module.talos, hcloud_load_balancer_service.this]
+  depends_on = [helm_release.external_secrets, module.talos]
 
   yaml_body = yamlencode({
     apiVersion = "external-secrets.io/v1"

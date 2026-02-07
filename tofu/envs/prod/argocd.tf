@@ -13,7 +13,7 @@ data "google_secret_manager_secret_version" "argocd_app_pem_key" {
 }
 
 resource "kubernetes_namespace_v1" "argocd" {
-  depends_on = [module.talos, hcloud_load_balancer_service.this]
+  depends_on = [module.talos]
 
   metadata {
     name = "argocd"
@@ -30,7 +30,7 @@ data "google_secret_manager_secret_version" "argocd_github_oauth_config" {
 }
 
 resource "helm_release" "argocd" {
-  depends_on = [module.talos, kubernetes_namespace_v1.argocd, hcloud_load_balancer_service.this]
+  depends_on = [module.talos, kubernetes_namespace_v1.argocd]
   name       = "argocd"
   namespace  = kubernetes_namespace_v1.argocd.metadata[0].name
 

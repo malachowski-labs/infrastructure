@@ -3,3 +3,8 @@ variable "cloudflare_token" {
   type        = string
   sensitive   = true
 }
+
+variable "google_cloud_project_name" {
+  type = string
+  default = "malachowski"
+}

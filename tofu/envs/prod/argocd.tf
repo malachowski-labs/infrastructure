@@ -77,10 +77,9 @@ resource "helm_release" "argocd" {
         rbac = {
           "policy.default" = "role:readonly"
           "policy.csv"     = <<-EOT
-          p, role:readonly, applications, get, */*, allow
-          p, role:readonly, projects, get, *, allow
-          p, role:admin, *, *, */*, allow
-        EOT
+            g, malachowski-labs:platform-team, role:admin
+            g, role:admin, role:readonly
+          EOT
         }
       }
 
@@ -198,6 +197,7 @@ resource "kubectl_manifest" "traefik" {
           values = <<EOT
             logs:
               general:
+                format: json
                 level: INFO
               access:
                 enabled: true

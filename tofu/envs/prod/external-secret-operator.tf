@@ -21,6 +21,16 @@ resource "google_project_iam_member" "external_secrets_secret_accessor" {
   member  = "serviceAccount:${google_service_account.external_secrets.email}"
 }
 
+# Grant Secret Manager access to the federated Kubernetes service account principal
+# Note: This is required for Workload Identity Federation. The service account
+# impersonation doesn't always inherit project-level permissions correctly, so we
+# grant access directly to the Kubernetes service account principal via WIF.
+resource "google_project_iam_member" "external_secrets_secret_accessor_wif" {
+  project = "malachowski"
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.kubernetes.name}/attribute.kubernetes_sa/${local.eso_sa_name}"
+}
+
 # =====================================
 # Workload Identity Pool & Provider
 # =====================================
@@ -440,7 +450,7 @@ resource "kubectl_manifest" "secret_store_gcp" {
                 name      = google_service_account.external_secrets.account_id
                 namespace = "external-secrets"
                 audiences = [
-                  "external-secrets"
+                  "//iam.googleapis.com/${google_iam_workload_identity_pool_provider.kubernetes_oidc.name}"
                 ]
               }
             }

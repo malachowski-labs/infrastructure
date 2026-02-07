@@ -58,6 +58,7 @@ resource "helm_release" "argocd" {
               - name: malachowski-labs
         EOT
           "users.anonymous.enabled" = false
+          "admin.enabled" = false
         }
 
 

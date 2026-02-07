@@ -5,7 +5,7 @@ locals {
   github_argocd_client_secret = local.github_argocd_oauth.client_secret
 
   argocd_base_url = "https://argocd.malachowski.me"
-  argocd_host = replace(local.argocd_base_url, "https://", "")
+  argocd_host     = replace(local.argocd_base_url, "https://", "")
 }
 
 data "google_secret_manager_secret_version" "argocd_app_pem_key" {
@@ -46,7 +46,7 @@ resource "helm_release" "argocd" {
         cm = {
           url = local.argocd_base_url
 
-          "dex.config" = <<-EOT
+          "dex.config"              = <<-EOT
           connectors:
           - type: github
             id: github
@@ -58,7 +58,7 @@ resource "helm_release" "argocd" {
               - name: malachowski-labs
         EOT
           "users.anonymous.enabled" = false
-          "admin.enabled" = false
+          "admin.enabled"           = false
         }
 
 

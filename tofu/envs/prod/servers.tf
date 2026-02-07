@@ -5,7 +5,7 @@ locals {
   ]
 
   control_plane_nodes = [
-    for i in range(0, 1) : {
+    for i in range(0, 3) : {
       id     = i + 1
       name   = "prod-malachowski-me-cp-${i}"
       labels = { role = "control-plane" }
@@ -46,6 +46,7 @@ module "talos" {
     "service-account-issuer"   = "https://oidc.malachowski.me"
     "service-account-jwks-uri" = "https://oidc.malachowski.me/openid/v1/jwks"
     "api-audiences"            = "https://oidc.malachowski.me"
+    "anonymous-auth"           = "true"
   }
 
   control_plane_allow_schedule = true
@@ -70,14 +71,4 @@ resource "hcloud_load_balancer_target" "this" {
   label_selector   = "role=control-plane"
   use_private_ip   = true
 }
-
-resource "hcloud_load_balancer_service" "this" {
-  depends_on = [ hcloud_load_balancer_service.this ]
-
-  load_balancer_id = hcloud_load_balancer.this.id
-  protocol         = "tcp"
-  listen_port      = 6443
-  destination_port = 6443
-}
-
 

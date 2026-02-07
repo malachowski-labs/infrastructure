@@ -5,18 +5,18 @@ data "cloudflare_zone" "this" {
 }
 
 resource "cloudflare_dns_record" "this" {
-  type = "A"
+  type    = "A"
   zone_id = data.cloudflare_zone.this.id
-  name = "malachowski.me"
+  name    = "malachowski.me"
   content = hcloud_load_balancer.this.ipv4
-  ttl = 1
+  ttl     = 1
 }
 
 resource "cloudflare_dns_record" "wildcard" {
-  type = "A"
+  type    = "A"
   zone_id = data.cloudflare_zone.this.id
-  name = "*.malachowski.me"
+  name    = "*.malachowski.me"
   content = hcloud_load_balancer.this.ipv4
-  ttl = 1
+  ttl     = 1
 }
 

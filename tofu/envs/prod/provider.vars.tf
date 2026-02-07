@@ -5,6 +5,6 @@ variable "cloudflare_token" {
 }
 
 variable "google_cloud_project_name" {
-  type = string
+  type    = string
   default = "malachowski"
 }

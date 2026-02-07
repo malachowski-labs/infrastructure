@@ -334,6 +334,35 @@ resource "kubernetes_ingress_v1" "oidc_discovery" {
 }
 
 # =====================================
+# RBAC for Anonymous JWKS Access
+# =====================================
+
+# Note: The ClusterRole "system:service-account-issuer-discovery" already exists
+# as a default Kubernetes resource. We just need to add an additional binding
+# for anonymous users.
+
+# ClusterRoleBinding to allow anonymous users to access JWKS
+resource "kubernetes_cluster_role_binding_v1" "oidc_jwks_anonymous" {
+  depends_on = [module.talos, hcloud_load_balancer_service.this]
+
+  metadata {
+    name = "system:service-account-issuer-discovery-anonymous"
+  }
+
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = "system:service-account-issuer-discovery"
+  }
+
+  subject {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "Group"
+    name      = "system:unauthenticated"
+  }
+}
+
+# =====================================
 # External Secrets Operator Resources
 # =====================================
 
@@ -409,12 +438,14 @@ resource "kubectl_manifest" "secret_store_gcp" {
         gcpsm = {
           projectID = "malachowski"
           auth = {
-            workloadIdentity = {
-              clusterLocation = "eu"
-              clusterName     = "prod.malachowski.me"
+            workloadIdentityFederation = {
+              audience = "//iam.googleapis.com/${google_iam_workload_identity_pool_provider.kubernetes_oidc.name}"
               serviceAccountRef = {
-                name      = kubernetes_service_account_v1.external_secrets.metadata[0].name
-                namespace = local.eso_namespace
+                name      = google_service_account.external_secrets.account_id
+                namespace = "external-secrets"
+                audiences = [
+                  "external-secrets"
+                ]
               }
             }
           }

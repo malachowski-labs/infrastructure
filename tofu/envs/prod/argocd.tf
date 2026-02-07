@@ -200,6 +200,7 @@ resource "kubectl_manifest" "traefik" {
                 format: json
                 level: INFO
               access:
+                format: json
                 enabled: true
             service:
               annotations:

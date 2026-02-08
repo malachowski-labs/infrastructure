@@ -212,6 +212,12 @@ resource "kubectl_manifest" "traefik" {
               access:
                 format: json
                 enabled: true
+            metrics:
+              prometheus:
+                serviceMonitor:
+                  enabled: true
+                prometheusRule:
+                  enabled: true
             service:
               annotations:
                 load-balancer.hetzner.cloud/location: ${hcloud_load_balancer.this.location}

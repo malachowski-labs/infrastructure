@@ -216,6 +216,8 @@ resource "kubectl_manifest" "traefik" {
               prometheus:
                 serviceMonitor:
                   enabled: true
+                  additionalLabels:
+                    release: kube-prometheus-stack
                 prometheusRule:
                   enabled: true
             service:

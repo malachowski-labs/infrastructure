@@ -213,7 +213,8 @@ resource "kubectl_manifest" "traefik" {
                 format: json
                 enabled: true
                 fields:
-                  defaultmode: keep
+                  general:
+                    defaultmode: keep
                   headers:
                     defaultmode: keep
             metrics:

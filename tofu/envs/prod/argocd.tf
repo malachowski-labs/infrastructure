@@ -212,8 +212,10 @@ resource "kubectl_manifest" "traefik" {
               access:
                 format: json
                 enabled: true
-                headers:
+                fields:
                   defaultmode: keep
+                  headers:
+                    defaultmode: keep
             metrics:
               prometheus:
                 serviceMonitor:

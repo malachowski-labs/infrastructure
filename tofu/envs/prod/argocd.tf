@@ -223,8 +223,6 @@ resource "kubectl_manifest" "traefik" {
                   enabled: true
                   additionalLabels:
                     release: kube-prometheus-stack
-                prometheusRule:
-                  enabled: true
             service:
               annotations:
                 load-balancer.hetzner.cloud/location: ${hcloud_load_balancer.this.location}

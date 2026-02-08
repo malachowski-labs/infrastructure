@@ -59,6 +59,17 @@ resource "helm_release" "argocd" {
         EOT
           "users.anonymous.enabled" = false
           "admin.enabled"           = false
+
+          "resource.compareoptions" = {
+            ignoreAggregatedRoles = true
+            ignoreResourceStatusField = "all"
+          }
+
+          "resource.customizations.ignoreDifferences.apps_StatefulSet" = {
+            jsonPointers = [
+              "/status"
+            ]
+          }
         }
 
 

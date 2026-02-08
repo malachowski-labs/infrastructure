@@ -10,6 +10,7 @@ resource "cloudflare_dns_record" "this" {
   name    = "malachowski.me"
   content = hcloud_load_balancer.this.ipv4
   ttl     = 1
+  proxied = true
 }
 
 resource "cloudflare_dns_record" "wildcard" {
@@ -18,5 +19,6 @@ resource "cloudflare_dns_record" "wildcard" {
   name    = "*.malachowski.me"
   content = hcloud_load_balancer.this.ipv4
   ttl     = 1
+  proxied = true
 }
 

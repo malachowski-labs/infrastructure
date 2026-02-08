@@ -56,20 +56,19 @@ resource "helm_release" "argocd" {
               clientSecret: $dex.github.clientSecret
               orgs:
               - name: malachowski-labs
-        EOT
+          EOT
           "users.anonymous.enabled" = false
           "admin.enabled"           = false
 
-          "resource.compareoptions" = {
-            ignoreAggregatedRoles = true
-            ignoreResourceStatusField = "all"
-          }
+          "resource.compareoptions" = <<-EOT
+          ignoreAggregateRoles: true
+          ignoreResourceStatusField: all
+          EOT
 
-          "resource.customizations.ignoreDifferences.apps_StatefulSet" = {
-            jsonPointers = [
-              "/status"
-            ]
-          }
+          "resource.customizations.ignoreDifferences.apps_StatefulSet" = <<-EOT
+          jsonPointers:
+            - /status
+          EOT
         }
 
 

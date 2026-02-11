@@ -227,6 +227,19 @@ resource "kubectl_manifest" "traefik" {
               annotations:
                 load-balancer.hetzner.cloud/location: ${hcloud_load_balancer.this.location}
                 load-balancer.hetzner.cloud/name: ${hcloud_load_balancer.this.name}
+                load-balancer.hetzner.cloud/use-private-ip: "true"
+                load-balancer.hetzner.cloud/uses-proxyprotocol: "true"
+            ports:
+              web:
+                proxyProtocol:
+                  trustedIPs:
+                    - 127.0.0.1/32
+                    - 10.0.0.0/8
+              websecure:
+                proxyProtocol:
+                  trustedIPs:
+                    - 127.0.0.1/32
+                    - 10.0.0.0/8
           EOT
         }
       }

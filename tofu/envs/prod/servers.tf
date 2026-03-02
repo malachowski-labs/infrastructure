@@ -57,7 +57,7 @@ module "talos" {
 resource "hcloud_load_balancer" "this" {
   name               = "prod-malachowski-me-lb"
   load_balancer_type = "lb11"
-  location           = "hel1"
+  location           = "nbg1"
 }
 
 resource "hcloud_load_balancer_network" "this" {

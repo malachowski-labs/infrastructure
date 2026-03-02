@@ -36,7 +36,7 @@ resource "google_project_iam_member" "external_secrets_secret_accessor_wif" {
 # =====================================
 
 resource "google_iam_workload_identity_pool" "kubernetes" {
-  workload_identity_pool_id = "kubernetes"
+  workload_identity_pool_id = "k8s-prod"
   display_name              = "Kubernetes Workload Identity"
   description               = "Workload Identity Pool for Kubernetes cluster"
   disabled                  = false
@@ -49,7 +49,7 @@ resource "google_iam_workload_identity_pool" "kubernetes" {
 
 resource "google_iam_workload_identity_pool_provider" "kubernetes_oidc" {
   workload_identity_pool_id          = google_iam_workload_identity_pool.kubernetes.workload_identity_pool_id
-  workload_identity_pool_provider_id = "kubernetes-oidc-provider"
+  workload_identity_pool_provider_id = "k8s"
   display_name                       = "Kubernetes OIDC Provider"
   description                        = "OIDC provider for Kubernetes service accounts"
   disabled                           = false

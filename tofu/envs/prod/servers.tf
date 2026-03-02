@@ -32,7 +32,7 @@ module "talos" {
   kubernetes_version = "v1.35.0"
 
   cluster_name  = "prod.malachowski.me"
-  location_name = "hel1"
+  location_name = "fsn1"
 
   control_plane_nodes = local.control_plane_nodes
   worker_nodes        = local.workers_nodes
@@ -57,7 +57,7 @@ module "talos" {
 resource "hcloud_load_balancer" "this" {
   name               = "prod-malachowski-me-lb"
   load_balancer_type = "lb11"
-  location           = "nbg1"
+  location           = "fsn1"
 }
 
 resource "hcloud_load_balancer_network" "this" {

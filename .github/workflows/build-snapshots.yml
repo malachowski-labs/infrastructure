@@ -37,7 +37,7 @@ jobs:
       matrix:
         architecture:
           - talos: amd64
-            server: cx33
+            server: cx23
           - talos: arm64
             server: cax21
 

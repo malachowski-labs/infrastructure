@@ -5,11 +5,11 @@ locals {
   ]
 
   control_plane_nodes = [
-    for i in range(0, 1) : {
+    for i in range(0, 3) : {
       id     = i + 1
       name   = "prod-malachowski-me-cp-${i}"
       labels = { role = "control-plane" }
-      type   = "cx33"
+      type   = "cx23"
     }
   ]
 

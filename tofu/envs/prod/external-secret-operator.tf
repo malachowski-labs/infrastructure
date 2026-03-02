@@ -49,7 +49,7 @@ resource "google_iam_workload_identity_pool" "kubernetes" {
 
 resource "google_iam_workload_identity_pool_provider" "kubernetes_oidc" {
   workload_identity_pool_id          = google_iam_workload_identity_pool.kubernetes.workload_identity_pool_id
-  workload_identity_pool_provider_id = "k8s"
+  workload_identity_pool_provider_id = "kubernetes"
   display_name                       = "Kubernetes OIDC Provider"
   description                        = "OIDC provider for Kubernetes service accounts"
   disabled                           = false

@@ -46,7 +46,7 @@ jobs:
             INFRA_READER_CLOUDFLARE_TOKEN:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_READER_CLOUDFLARE_TOKEN_SECRET_NAME }}
 
       - name: Set Up Open Tofu
-        uses: opentofu/setup-opentofu@v1
+        uses: opentofu/setup-opentofu@v2
         with:
           tofu_version: 1.10.5
 

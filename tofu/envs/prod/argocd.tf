@@ -156,7 +156,7 @@ resource "kubectl_manifest" "cluster_config" {
 
       source = {
         repoURL        = "https://github.com/malachowski-labs/manifests"
-        path           = "clusters/prod.malachowski.me"
+        path           = "clusters/prod.malachowski.me/apps"
         targetRevision = "HEAD"
 
         directory = {

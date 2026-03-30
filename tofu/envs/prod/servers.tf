@@ -54,6 +54,51 @@ module "talos" {
   enable_floating_ip = true
 }
 
+# ----------------------------
+# Cluster Autoscaler Configuration
+# ----------------------------
+# Automatically scales worker nodes based on resource demand.
+# See docs/cluster-autoscaling.md for full documentation.
+
+# Enable autoscaler
+variable "autoscaler_enabled" {
+  description = "Enable cluster autoscaler"
+  type        = bool
+  default     = true
+}
+
+# Define autoscaler node pools
+variable "autoscaler_nodepools" {
+  description = "Autoscaler node pools configuration"
+  type = list(object({
+    name          = string
+    instance_type = string
+    region        = string
+    min_nodes     = number
+    max_nodes     = number
+    labels        = optional(map(string), {})
+    taints = optional(list(object({
+      key    = string
+      value  = string
+      effect = string
+    })), [])
+  }))
+  default = [
+    {
+      name          = "worker-auto"
+      instance_type = "cpx22"    # 3 vCPU, 4GB RAM
+      region        = "fsn1"     # Falkenstein
+      min_nodes     = 0          # Can scale to zero when not needed
+      max_nodes     = 3          # Maximum of 3 worker nodes
+      labels        = {
+        "workload-type" = "general"
+        "autoscaled"    = "true"
+      }
+      taints        = []
+    }
+  ]
+}
+
 resource "hcloud_load_balancer" "this" {
   name               = "prod-malachowski-me-lb"
   load_balancer_type = "lb11"

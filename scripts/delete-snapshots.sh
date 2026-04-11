@@ -22,7 +22,7 @@ hcloud_api() {
     local method="$1" path="$2"
     shift 2
     curl -sf -X "$method" \
-        -H "Authorization Bearer $HCLOUD_TOKEN" \
+        -H "Authorization: Bearer $HCLOUD_TOKEN" \
         -H "Content-Type: application/json" \
         "https://api.hetzner.cloud/v1/$path" \
         "$@"
@@ -30,9 +30,9 @@ hcloud_api() {
 
 # --- Main Logic ---
 echo "==> [1/2] Fetching snapshots..."
-SNAPSHOTS=$(hcloud_api GET "/images?type=snapshot&label_selector=microos-snapshot%3Dyes&sort=created:desc")
+SNAPSHOTS=$(hcloud_api GET "/images?type=snapshot&label_selector=microos-snapshot%3Dtrue&sort=created:desc")
 
-TOTAL=$(echo "$SNAPSHOTS" | jq '.images | lenght')
+TOTAL=$(echo "$SNAPSHOTS" | jq '.images | length')
 echo "  Found ${TOTAL} snapshot(s) total."
 
 if [[ "$TOTAL" -eq 0 ]]; then

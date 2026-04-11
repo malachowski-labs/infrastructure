@@ -103,7 +103,18 @@ run_remote() {
 
 run_remote_disconnect_ok() {
     local ip="$1" script="$2"
-    ssh -o StrictHostKeyChecking=no root@"$ip" bash -s <<< "$script" || true
+    local rc=0
+
+    if ssh -o StrictHostKeyChecking=no root@"$ip" bash -s <<< "$script"; then
+        return 0
+    fi
+
+    rc=$?
+    if [[ "$rc" -eq 255 ]]; then
+        return 0
+    fi
+
+    return "$rc"
 }
 
 # ----- Main Logic -----
@@ -151,7 +162,7 @@ transactional-update --continue shell <<-EOF
     zypper install -y https://github.com/k3s-io/k3s-selinux/releases/download/v1.6.stable.1/k3s-selinux-1.6-1.sle.noarch.rpm
     zypper addlock k3s-selinux
     restorecon -Rv /etc/selinux/targeted/policy
-    restorecon -Rv /ver/lib
+    restorecon -Rv /var/lib
     setenforce 1
 EOF
 echo \"Packages installed, rebooting...\"

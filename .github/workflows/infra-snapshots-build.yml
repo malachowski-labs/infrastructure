@@ -13,13 +13,6 @@ on:
       - "scripts/create-snapshots.sh"
       - ".github/workflows/infra-snapshots-build.yml"
 
-  pull_request_target:
-    branches:
-      - main
-    paths:
-      - "scripts/create-snapshots.sh"
-      - ".github/workflows/infra-snapshots-build.yml"
-
 jobs:
   build:
     runs-on: ubuntu-latest

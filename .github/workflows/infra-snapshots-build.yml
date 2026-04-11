@@ -1,0 +1,57 @@
+name: build-snapshots
+
+concurrency:
+  group: snapshots
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/create-snapshots.sh"
+      - ".github/workflows/infra-snapshots-build.yml"
+
+  pull_request_target:
+    branches:
+      - main
+    paths:
+      - "scripts/create-snapshots.sh"
+      - ".github/workflows/infra-snapshots-build.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86, arm64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GC_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Fetch secrets
+        id: secrets
+        uses: google-github-actions/get-secretmanager-secrets@v3
+        with:
+          secrets: |
+            infra-exec-hcloud-token:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_EXECUTOR_HCLOUD_TOKEN_SECRET_NAME }}
+
+      - name: Build snapshots
+        env:
+          HCLOUD_TOKEN: ${{ steps.secrets.outputs.infra-exec-hcloud-token }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          echo "Building snapshots for architecture: $ARCH"
+          ./scripts/create-snapshots.sh

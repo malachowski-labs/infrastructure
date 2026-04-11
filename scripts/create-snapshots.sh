@@ -79,6 +79,8 @@ hcloud_api() {
 
 wait_for_action() {
     local action_id="$1"
+    local timeout=$((10*60))
+    local deadline=$(( $(date +%s) + timeout ))
     echo "Waiting for action $action_id to complete..."
     while true; do
         local status
@@ -88,6 +90,11 @@ wait_for_action() {
             "error") echo "Action $action_id failed."; exit 1 ;;
             *) echo "Action $action_id is still in progress..."; sleep 5 ;;
         esac
+
+        if [[ $(date +%s) -ge $deadline ]]; then
+            echo "Error: Action $action_id did not complete within $((timeout / 60)) minutes."
+             exit 1
+         fi
     done
 }
 

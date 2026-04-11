@@ -26,10 +26,10 @@ jobs:
         uses: google-github-actions/get-secretmanager-secrets@v3
         with:
           secrets: |
-            infra-exec-hcloud-token:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_EXECUTOR_HCLOUD_TOKEN_SECRET_NAME }}
+            infra_exec_hcloud_token:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_EXECUTOR_HCLOUD_TOKEN_SECRET_NAME }}
 
       - name: Cleanup snapshots
         env:
-          HCLOUD_TOKEN: ${{ steps.secrets.outputs.infra-exec-hcloud-token }}
+          HCLOUD_TOKEN: ${{ steps.secrets.outputs.infra_exec_hcloud_token }}
         run: |
           ./scripts/delete-snapshots.sh

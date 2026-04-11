@@ -186,19 +186,21 @@ wait_for_ssh "$SERVER_IP"
 echo "==> [4/9] Downloading MicroOS image..."
 run_remote "$SERVER_IP" "wget --timeout=5 --waitretry=5 --tries=5 --retry-connrefused --inet4-only ${MICROOS_URL}"
 
-echo "==> [5/9] Installing qemu-img and writing image to disk (Expect disconnection)..."
+echo "==> [5/9] Installing qemu-img and writing image to disk..."
 # shellcheck disable=SC2016
-run_remote_disconnect_ok "$SERVER_IP" 'set -e
+run_remote "$SERVER_IP" 'set -e
     echo "Installing qemu-utils..."
     apt-get update -qq
     apt-get install -y -qq qemu-utils
-    echo "MicroOS image loaded, writing to disk..."
+    echo "Writing MicroOS image to disk (this will take a few minutes)..."
     qemu-img convert -p -f qcow2 -O host_device $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /dev/sda
-    echo 1 > /proc/sys/kernel/sysrq
-    echo b > /proc/sysrq-trigger
+    echo "Image written successfully"
 '
 
-echo "Waiting for image write and reboot to complete..."
+echo "==> [5.5/9] Rebooting into MicroOS (Expect disconnection)..."
+run_remote_disconnect_ok "$SERVER_IP" 'echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger || reboot -f'
+
+echo "Waiting for reboot to complete..."
 sleep 30
 wait_for_ssh "$SERVER_IP"
 

@@ -101,7 +101,7 @@ wait_for_action() {
 wait_for_ssh() {
     local ip="$1"
     echo "Waiting for SSH to become available at $ip..."
-    until ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
+    until ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
         -o BatchMode=yes root@"$ip" true 2>/dev/null; do
         sleep 5
     done
@@ -110,14 +110,14 @@ wait_for_ssh() {
 
 run_remote() {
     local ip="$1" script="$2"
-    ssh -o StrictHostKeyChecking=no root@"$ip" bash -s <<< "$script"
+    ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=accept-new root@"$ip" bash -s <<< "$script"
 }
 
 run_remote_disconnect_ok() {
     local ip="$1" script="$2"
     local rc=0
 
-    if ssh -o StrictHostKeyChecking=no root@"$ip" bash -s <<< "$script"; then
+    if ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=accept-new root@"$ip" bash -s <<< "$script"; then
         return 0
     fi
 
@@ -131,13 +131,37 @@ run_remote_disconnect_ok() {
 
 # ----- Main Logic -----
 
-# Cleanup function to ensure server deletion on exit
+# Cleanup function to ensure server and SSH key deletion on exit
 cleanup() {
     if [[ -n "${SERVER_ID:-}" ]]; then
         echo "==> Cleaning up server $SERVER_ID..."
         hcloud_api DELETE "servers/${SERVER_ID}" || echo "Warning: Failed to delete server $SERVER_ID"
     fi
+    if [[ -n "${SSH_KEY_ID:-}" ]]; then
+        echo "==> Cleaning up SSH key $SSH_KEY_ID..."
+        hcloud_api DELETE "ssh_keys/${SSH_KEY_ID}" || echo "Warning: Failed to delete SSH key $SSH_KEY_ID"
+    fi
+    if [[ -n "${TEMP_SSH_KEY:-}" && -f "${TEMP_SSH_KEY}" ]]; then
+        echo "==> Cleaning up temporary SSH key files..."
+        rm -f "${TEMP_SSH_KEY}" "${TEMP_SSH_KEY}.pub"
+    fi
 }
+
+# Set up cleanup trap early
+trap cleanup EXIT
+
+echo "==> [0/7] Creating temporary SSH key..."
+TEMP_SSH_KEY=$(mktemp)
+ssh-keygen -t ed25519 -f "$TEMP_SSH_KEY" -N "" -C "temp-microos-${ARCH}-$$" >/dev/null
+SSH_PUB_KEY=$(cat "${TEMP_SSH_KEY}.pub")
+
+echo "==> [0/7] Uploading SSH key to Hetzner..."
+SSH_KEY_RESPONSE=$(hcloud_api POST "ssh_keys" -d "{
+    \"name\": \"temp-microos-${ARCH}-$$\",
+    \"public_key\": \"${SSH_PUB_KEY}\"
+}")
+SSH_KEY_ID=$(echo "$SSH_KEY_RESPONSE" | jq -r '.ssh_key.id')
+echo "SSH Key ID: $SSH_KEY_ID"
 
 echo "==> [1/7] Creating server ($SERVER_TYPE, ARCH=$ARCH, Rescue=linux64)..."
 CREATE_RESPONSE=$(hcloud_api POST "servers" -d "{
@@ -145,16 +169,13 @@ CREATE_RESPONSE=$(hcloud_api POST "servers" -d "{
     \"server_type\": \"$SERVER_TYPE\",
     \"image\": \"ubuntu-22.04\",
     \"location\": \"fsn1\",
-    \"rescue\": \"linux64\",
+    \"ssh_keys\": [${SSH_KEY_ID}],
     \"start_after_create\": true
 }")
 
 SERVER_ID=$(echo "$CREATE_RESPONSE" | jq -r '.server.id')
 SERVER_IP=$(echo "$CREATE_RESPONSE" | jq -r '.server.public_net.ipv4.ip')
 ACTION_ID=$(echo "$CREATE_RESPONSE" | jq -r '.action.id')
-
-# Set up cleanup trap now that we have a SERVER_ID
-trap cleanup EXIT
 
 echo "Server ID: $SERVER_ID, IP: $SERVER_IP"
 wait_for_action "$ACTION_ID"

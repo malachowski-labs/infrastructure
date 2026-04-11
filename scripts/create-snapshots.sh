@@ -188,12 +188,14 @@ run_remote "$SERVER_IP" "wget --timeout=5 --waitretry=5 --tries=5 --retry-connre
 
 echo "==> [5/9] Installing qemu-img and writing image to disk (Expect disconnection)..."
 # shellcheck disable=SC2016
-run_remote_disconnect_ok "$SERVER_IP" 'set -ex
+run_remote_disconnect_ok "$SERVER_IP" 'set -e
     echo "Installing qemu-utils..."
     apt-get update -qq
     apt-get install -y -qq qemu-utils
     echo "MicroOS image loaded, writing to disk..."
-    ( qemu-img convert -p -f qcow2 -O host_device $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /dev/sda && echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger ) &
+    qemu-img convert -p -f qcow2 -O host_device $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /dev/sda
+    echo 1 > /proc/sys/kernel/sysrq
+    echo b > /proc/sysrq-trigger
 '
 
 echo "Waiting for image write and reboot to complete..."

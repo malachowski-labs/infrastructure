@@ -101,7 +101,7 @@ wait_for_action() {
 wait_for_ssh() {
     local ip="$1"
     echo "Waiting for SSH to become available at $ip..."
-    until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+    until ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
         -o BatchMode=yes root@"$ip" true 2>/dev/null; do
         sleep 5
     done

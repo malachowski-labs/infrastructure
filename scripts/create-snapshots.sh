@@ -100,9 +100,9 @@ wait_for_action() {
 
 wait_for_ssh() {
     local ip="$1"
-    echo "Waiting for SSH to become available at $ip..."
     until ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
         -o BatchMode=yes root@"$ip" true 2>/dev/null; do
+        echo "Waiting for SSH to become available at $ip..."
         sleep 5
     done
     echo "SSH is now available at $ip."
@@ -186,13 +186,17 @@ wait_for_ssh "$SERVER_IP"
 echo "==> [4/9] Downloading MicroOS image..."
 run_remote "$SERVER_IP" "wget --timeout=5 --waitretry=5 --tries=5 --retry-connrefused --inet4-only ${MICROOS_URL}"
 
-echo "==> [5/9] Writing image to disk (Expect disconnection)..."
+echo "==> [5/9] Installing qemu-img and writing image to disk (Expect disconnection)..."
 # shellcheck disable=SC2016
 run_remote_disconnect_ok "$SERVER_IP" 'set -ex
+    echo "Installing qemu-utils..."
+    apt-get update -qq
+    apt-get install -y -qq qemu-utils
     echo "MicroOS image loaded, writing to disk..."
     qemu-img convert -p -f qcow2 -O host_device $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /dev/sda
     echo "Image written to disk, rebooting..."
-    sleep 1 && udevadm settle && reboot
+    sync
+    sleep 1 && reboot
 '
 
 sleep 5

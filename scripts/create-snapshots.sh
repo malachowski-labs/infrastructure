@@ -150,12 +150,12 @@ cleanup() {
 # Set up cleanup trap early
 trap cleanup EXIT
 
-echo "==> [0/7] Creating temporary SSH key..."
-TEMP_SSH_KEY=$(mktemp)
-ssh-keygen -t ed25519 -f "$TEMP_SSH_KEY" -N "" -C "temp-microos-${ARCH}-$$" >/dev/null
+echo "==> [1/9] Creating temporary SSH key..."
+TEMP_SSH_KEY=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 5 ; echo '')
+ssh-keygen -t ed25519 -f "$TEMP_SSH_KEY" -N "" -C "temp-microos-${ARCH}-$$"
 SSH_PUB_KEY=$(cat "${TEMP_SSH_KEY}.pub")
 
-echo "==> [0/7] Uploading SSH key to Hetzner..."
+echo "==> [2/9] Uploading SSH key to Hetzner..."
 SSH_KEY_RESPONSE=$(hcloud_api POST "ssh_keys" -d "{
     \"name\": \"temp-microos-${ARCH}-$$\",
     \"public_key\": \"${SSH_PUB_KEY}\"
@@ -163,13 +163,14 @@ SSH_KEY_RESPONSE=$(hcloud_api POST "ssh_keys" -d "{
 SSH_KEY_ID=$(echo "$SSH_KEY_RESPONSE" | jq -r '.ssh_key.id')
 echo "SSH Key ID: $SSH_KEY_ID"
 
-echo "==> [1/7] Creating server ($SERVER_TYPE, ARCH=$ARCH, Rescue=linux64)..."
+echo "==> [3/9] Creating server ($SERVER_TYPE, ARCH=$ARCH, Rescue=linux64)..."
 CREATE_RESPONSE=$(hcloud_api POST "servers" -d "{
     \"name\": \"temp-microos-${ARCH}-$$\",
     \"server_type\": \"$SERVER_TYPE\",
     \"image\": \"ubuntu-22.04\",
     \"location\": \"fsn1\",
     \"ssh_keys\": [${SSH_KEY_ID}],
+    \"rescue\": \"linux64\",
     \"start_after_create\": true
 }")
 
@@ -182,10 +183,10 @@ wait_for_action "$ACTION_ID"
 
 wait_for_ssh "$SERVER_IP"
 
-echo "==> [2/7] Downloading MicroOS image..."
+echo "==> [4/9] Downloading MicroOS image..."
 run_remote "$SERVER_IP" "wget --timeout=5 --waitretry=5 --tries=5 --retry-connrefused --inet4-only ${MICROOS_URL}"
 
-echo "==> [3/7] Writing image to disk (Expect disconnection)..."
+echo "==> [5/9] Writing image to disk (Expect disconnection)..."
 # shellcheck disable=SC2016
 run_remote_disconnect_ok "$SERVER_IP" 'set -ex
     echo "MicroOS image loaded, writing to disk..."
@@ -197,7 +198,7 @@ run_remote_disconnect_ok "$SERVER_IP" 'set -ex
 sleep 5
 wait_for_ssh "$SERVER_IP"
 
-echo "==> [4/7] Installing packages (expect disconnect)..."
+echo "==> [6/9] Installing packages (expect disconnect)..."
 run_remote_disconnect_ok "$SERVER_IP" "set -ex
 transactional-update --continue pkg install -y ${PACKAGES_STR}
 transactional-update --continue shell <<-EOF
@@ -216,15 +217,16 @@ sleep 1 && udevadm settle && reboot
 sleep 5
 wait_for_ssh "$SERVER_IP"
 
-echo "==> [5/7] Cleaning up..."
+echo "==> [7/9] Cleaning up..."
 run_remote "$SERVER_IP" 'set -ex
     rm -rf /etc/ssh/ssh_host_*
     echo "Make sure to use Network Manager"
+    mkdir -p /etc/NetworkManager
     touch /etc/NetworkManager/NetworkManager.conf
     sleep 1 && udevadm settle
 '
 
-echo "==> [6/7] Creating snapshot..."
+echo "==> [8/9] Creating snapshot..."
 SNAPSHOT_RESPONSE=$(hcloud_api POST "servers/${SERVER_ID}/actions/create_image" -d "{
     \"description\": \"${SNAPSHOT_NAME}\",
     \"type\": \"snapshot\",
@@ -242,7 +244,7 @@ wait_for_action "$SNAPSHOT_ACTION_ID"
 SNAPSHOT_ID=$(echo "$SNAPSHOT_RESPONSE" | jq -r '.image.id')
 echo "Snapshot created: ID=$SNAPSHOT_ID, Name=$SNAPSHOT_NAME"
 
-echo "==> [7/7] Cleaning up server..."
+echo "==> [9/9] Cleaning up server..."
 trap - EXIT  # Disable trap since we're cleaning up manually
 hcloud_api DELETE "servers/${SERVER_ID}"
 

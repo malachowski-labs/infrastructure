@@ -30,7 +30,7 @@ hcloud_api() {
 
 # --- Main Logic ---
 echo "==> [1/2] Fetching snapshots..."
-SNAPSHOTS=$(hcloud_api GET "/images?type=snapshot&label_selector=microos-snapshot%3Dtrue&sort=created:desc")
+SNAPSHOTS=$(hcloud_api GET "images?type=snapshot&label_selector=microos-snapshot%3Dtrue&sort=created:desc")
 
 TOTAL=$(echo "$SNAPSHOTS" | jq '.images | length')
 echo "  Found ${TOTAL} snapshot(s) total."
@@ -71,7 +71,7 @@ for ARCH in "x86" "arm64"; do
 
     while IFS= read -r SNAP_ID; do
         echo "  Deleting snapshot ID=${SNAP_ID}..."
-        hcloud_api DELETE "/images/${SNAP_ID}" && echo "    Deleted" || echo "  WARN: failed to delete snapshot ID=${SNAP_ID}" >&2
+        hcloud_api DELETE "images/${SNAP_ID}" && echo "    Deleted" || echo "  WARN: failed to delete snapshot ID=${SNAP_ID}" >&2
     done < <(echo "$TO_DELETE" | jq -r '.[].id')
 
     echo ""

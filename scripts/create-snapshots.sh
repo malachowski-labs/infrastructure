@@ -47,6 +47,11 @@ if [[ "$ARCH" != "x86" && "$ARCH" != "arm64" ]]; then
     exit 1
 fi
 
+if ! command -v jq &> /dev/null; then
+    echo "Error: 'jq' is required but not installed."
+    exit 1
+fi
+
 # ----- Derived Values -----
 
 if [[ "$ARCH" == "x86" ]]; then
@@ -119,8 +124,16 @@ run_remote_disconnect_ok() {
 
 # ----- Main Logic -----
 
+# Cleanup function to ensure server deletion on exit
+cleanup() {
+    if [[ -n "${SERVER_ID:-}" ]]; then
+        echo "==> Cleaning up server $SERVER_ID..."
+        hcloud_api DELETE "servers/${SERVER_ID}" || echo "Warning: Failed to delete server $SERVER_ID"
+    fi
+}
+
 echo "==> [1/7] Creating server ($SERVER_TYPE, ARCH=$ARCH, Rescue=linux64)..."
-CREATE_RESPONSE=$(hcloud_api POST "/servers" -d "{
+CREATE_RESPONSE=$(hcloud_api POST "servers" -d "{
     \"name\": \"temp-microos-${ARCH}-$$\",
     \"server_type\": \"$SERVER_TYPE\",
     \"image\": \"ubuntu-22.04\",
@@ -132,6 +145,9 @@ CREATE_RESPONSE=$(hcloud_api POST "/servers" -d "{
 SERVER_ID=$(echo "$CREATE_RESPONSE" | jq -r '.server.id')
 SERVER_IP=$(echo "$CREATE_RESPONSE" | jq -r '.server.public_net.ipv4.ip')
 ACTION_ID=$(echo "$CREATE_RESPONSE" | jq -r '.action.id')
+
+# Set up cleanup trap now that we have a SERVER_ID
+trap cleanup EXIT
 
 echo "Server ID: $SERVER_ID, IP: $SERVER_IP"
 wait_for_action "$ACTION_ID"
@@ -181,7 +197,7 @@ run_remote "$SERVER_IP" 'set -ex
 '
 
 echo "==> [6/7] Creating snapshot..."
-SNAPSHOT_RESPONSE=$(hcloud_api POST "/servers/${SERVER_ID}/actions/create_image" -d "{
+SNAPSHOT_RESPONSE=$(hcloud_api POST "servers/${SERVER_ID}/actions/create_image" -d "{
     \"description\": \"${SNAPSHOT_NAME}\",
     \"type\": \"snapshot\",
     \"labels\": {
@@ -199,6 +215,7 @@ SNAPSHOT_ID=$(echo "$SNAPSHOT_RESPONSE" | jq -r '.image.id')
 echo "Snapshot created: ID=$SNAPSHOT_ID, Name=$SNAPSHOT_NAME"
 
 echo "==> [7/7] Cleaning up server..."
-hcloud_api DELETE "/servers/${SERVER_ID}"
+trap - EXIT  # Disable trap since we're cleaning up manually
+hcloud_api DELETE "servers/${SERVER_ID}"
 
 echo "==> Done. Snapshot '${SNAPSHOT_NAME}' (ID: ${SNAPSHOT_ID}) is ready for use."

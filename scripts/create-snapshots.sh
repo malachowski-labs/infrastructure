@@ -195,10 +195,11 @@ run_remote_disconnect_ok "$SERVER_IP" 'set -ex
     echo "MicroOS image loaded, writing to disk..."
     qemu-img convert -p -f qcow2 -O host_device $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /dev/sda
     echo "Image written to disk, rebooting..."
-    echo b > /proc/sysrq-trigger || reboot -f
+    nohup sh -c "sleep 2 && reboot -f" &
 '
 
-sleep 5
+echo "Waiting for reboot to complete..."
+sleep 10
 wait_for_ssh "$SERVER_IP"
 
 echo "==> [6/9] Installing packages (expect disconnect)..."

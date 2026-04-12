@@ -196,23 +196,46 @@ run_remote "$SERVER_IP" 'set -e
     echo "Writing MicroOS image to temporary location..."
     qemu-img convert -p -f qcow2 -O raw $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /tmp/microos.raw
     
-    echo "Mounting the MicroOS image to inject SSH key..."
-    LOOP_DEVICE=$(losetup -f)
-    losetup -P "$LOOP_DEVICE" /tmp/microos.raw
+    echo "Setting up loop device for the image..."
+    LOOP_DEVICE=$(losetup -f --show -P /tmp/microos.raw)
+    echo "Loop device: $LOOP_DEVICE"
     
-    # Wait for partition device nodes to appear
+    # Wait for partition device nodes and probe partitions
     sleep 2
+    partprobe "$LOOP_DEVICE" || true
+    sleep 1
     
+    # List available partitions
+    ls -la "${LOOP_DEVICE}"* || true
+    lsblk "$LOOP_DEVICE" || true
+    
+    # Try to find the root partition (usually p3 or p2)
+    ROOT_PART=""
+    if [ -e "${LOOP_DEVICE}p3" ]; then
+        ROOT_PART="${LOOP_DEVICE}p3"
+    elif [ -e "${LOOP_DEVICE}p2" ]; then
+        ROOT_PART="${LOOP_DEVICE}p2"
+    else
+        echo "ERROR: Cannot find root partition"
+        losetup -d "$LOOP_DEVICE"
+        exit 1
+    fi
+    
+    echo "Mounting root partition: $ROOT_PART"
     mkdir -p /mnt/microos
-    mount "${LOOP_DEVICE}p3" /mnt/microos || mount "${LOOP_DEVICE}3" /mnt/microos
+    mount "$ROOT_PART" /mnt/microos
+    
+    echo "Injecting SSH key..."
     mkdir -p /mnt/microos/root/.ssh
     chmod 700 /mnt/microos/root/.ssh
     cat ~/.ssh/authorized_keys > /mnt/microos/root/.ssh/authorized_keys
     chmod 600 /mnt/microos/root/.ssh/authorized_keys
+    
+    echo "Cleaning up..."
     umount /mnt/microos
     losetup -d "$LOOP_DEVICE"
     
-    echo "SSH key injected, writing image to disk..."
+    echo "Writing modified image to disk..."
     dd if=/tmp/microos.raw of=/dev/sda bs=4M status=progress
     sync
     

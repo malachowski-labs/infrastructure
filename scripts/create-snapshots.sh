@@ -192,19 +192,31 @@ run_remote "$SERVER_IP" 'set -e
     echo "Installing qemu-utils..."
     apt-get update -qq
     apt-get install -y -qq qemu-utils
-    echo "Writing MicroOS image to disk (this will take a few minutes)..."
-    qemu-img convert -p -f qcow2 -O host_device $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /dev/sda
-    echo "Image written successfully"
     
-    echo "Mounting MicroOS partitions to inject SSH key..."
+    echo "Writing MicroOS image to temporary location..."
+    qemu-img convert -p -f qcow2 -O raw $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /tmp/microos.raw
+    
+    echo "Mounting the MicroOS image to inject SSH key..."
+    LOOP_DEVICE=$(losetup -f)
+    losetup -P "$LOOP_DEVICE" /tmp/microos.raw
+    
+    # Wait for partition device nodes to appear
+    sleep 2
+    
     mkdir -p /mnt/microos
-    mount /dev/sda3 /mnt/microos
+    mount "${LOOP_DEVICE}p3" /mnt/microos || mount "${LOOP_DEVICE}3" /mnt/microos
     mkdir -p /mnt/microos/root/.ssh
     chmod 700 /mnt/microos/root/.ssh
     cat ~/.ssh/authorized_keys > /mnt/microos/root/.ssh/authorized_keys
     chmod 600 /mnt/microos/root/.ssh/authorized_keys
     umount /mnt/microos
-    echo "SSH key injected successfully"
+    losetup -d "$LOOP_DEVICE"
+    
+    echo "SSH key injected, writing image to disk..."
+    dd if=/tmp/microos.raw of=/dev/sda bs=4M status=progress
+    sync
+    
+    echo "Image written successfully"
 '
 
 echo "==> [5.5/9] Rebooting into MicroOS (Expect disconnection)..."

@@ -1,0 +1,35 @@
+name: cleanup-snapshots
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Every Sunday at midnight
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GC_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GC_WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Fetch secrets
+        id: secrets
+        uses: google-github-actions/get-secretmanager-secrets@v3
+        with:
+          secrets: |
+            infra_exec_hcloud_token:${{ vars.GC_PROJECT_ID }}/${{ vars.INFRA_EXECUTOR_HCLOUD_TOKEN_SECRET_NAME }}
+
+      - name: Cleanup snapshots
+        env:
+          HCLOUD_TOKEN: ${{ steps.secrets.outputs.infra_exec_hcloud_token }}
+        run: |
+          ./scripts/delete-snapshots.sh

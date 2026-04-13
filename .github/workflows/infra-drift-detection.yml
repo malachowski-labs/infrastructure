@@ -103,7 +103,7 @@ jobs:
 
       - name: Publish Drift Report
         if: steps.plan.outputs.exitcode == 2
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           SUMMARY: ${{ steps.comment-body.outputs.summary }}
         with:
@@ -149,7 +149,7 @@ jobs:
 
       - name: Close issues when drift is not detected
         if: steps.plan.outputs.exitcode == 0
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

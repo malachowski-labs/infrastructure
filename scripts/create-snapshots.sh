@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+# =============================================================================
+# Create MicroOS snapshots for K3s on Hetzner Cloud
+# Based on: https://github.com/KacperMalachowski/homelab/blob/main/packer/microos/hcloud/k3s.pkr.hcl
+# =============================================================================
+
 # ----- Configuration -----
 HCLOUD_TOKEN="${HCLOUD_TOKEN:-}"
 NAME_SUFFIX="${NAME_SUFFIX:-}"
@@ -35,7 +40,7 @@ NEEDED_PACKAGES=(
     qemu-guest-agent
 )
 
-# ----- Validation ----
+# ----- Validation -----
 
 if [[ -z "$HCLOUD_TOKEN" ]]; then
     echo "Error: HCLOUD_TOKEN environment variable is not set."
@@ -67,14 +72,29 @@ fi
 PACKAGES_STR="${NEEDED_PACKAGES[*]} ${EXTRA_PACKAGES[*]}"
 
 # ----- Helpers -----
+
 hcloud_api() {
     local method="$1" path="$2"
     shift 2
-    curl -sf -X "$method" \
+
+    # Capture both body and HTTP status so we can show useful errors
+    local response http_code body
+    response=$(curl -sS -w '\n%{http_code}' -X "$method" \
         -H "Authorization: Bearer $HCLOUD_TOKEN" \
         -H "Content-Type: application/json" \
         "https://api.hetzner.cloud/v1/$path" \
-        "$@"
+        "$@" || true)
+
+    http_code="${response##*$'\n'}"
+    body="${response%$'\n'$http_code}"
+
+    if [[ "$http_code" -ge 400 || "$http_code" -lt 200 ]]; then
+        echo "Hetzner API error ($http_code) on $method $path:" >&2
+        echo "$body" >&2
+        exit 1
+    fi
+
+    echo "$body"
 }
 
 wait_for_action() {
@@ -86,42 +106,89 @@ wait_for_action() {
         local status
         status=$(hcloud_api GET "actions/$action_id" | jq -r '.action.status')
         case "$status" in
-            "success") echo "Action $action_id completed successfully."; break ;;
-            "error") echo "Action $action_id failed."; exit 1 ;;
-            *) echo "Action $action_id is still in progress..."; sleep 5 ;;
+            "success") echo "Action completed successfully."; break ;;
+            "error") echo "Action failed."; exit 1 ;;
+            *) sleep 5 ;;
         esac
 
         if [[ $(date +%s) -ge $deadline ]]; then
-            echo "Error: Action $action_id did not complete within $((timeout / 60)) minutes."
-             exit 1
-         fi
+            echo "Error: Action did not complete within $((timeout / 60)) minutes."
+            exit 1
+        fi
     done
 }
 
 wait_for_ssh() {
     local ip="$1"
-    until ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
+    echo "Waiting for SSH to become available at $ip..."
+    local max_attempts=60
+    local attempt=0
+
+    until ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
         -o BatchMode=yes root@"$ip" true 2>/dev/null; do
-        echo "Waiting for SSH to become available at $ip..."
+        attempt=$((attempt + 1))
+        if [[ $attempt -ge $max_attempts ]]; then
+            echo "Error: SSH did not become available after $max_attempts attempts"
+            exit 1
+        fi
         sleep 5
     done
-    echo "SSH is now available at $ip."
+    echo "SSH is now available."
+}
+
+wait_for_ssh_down() {
+    local ip="$1"
+    echo "Waiting for SSH to go down at $ip..."
+    local max_attempts=36
+    local attempt=0
+
+    while ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 \
+        -o BatchMode=yes root@"$ip" true 2>/dev/null; do
+        attempt=$((attempt + 1))
+        if [[ $attempt -ge $max_attempts ]]; then
+            echo "Error: SSH did not go down after reboot"
+            exit 1
+        fi
+        sleep 5
+    done
+
+    echo "SSH is down."
+}
+
+wait_for_reboot_cycle() {
+    local ip="$1"
+    wait_for_ssh_down "$ip"
+    wait_for_ssh "$ip"
 }
 
 run_remote() {
     local ip="$1" script="$2"
-    ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=accept-new root@"$ip" bash -s <<< "$script"
+    ssh -i "$TEMP_SSH_KEY" \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=10 \
+        -o ServerAliveInterval=5 \
+        -o ServerAliveCountMax=6 \
+        root@"$ip" bash -s <<< "$script"
 }
 
 run_remote_disconnect_ok() {
     local ip="$1" script="$2"
-    local rc=0
 
-    if ssh -i "$TEMP_SSH_KEY" -o StrictHostKeyChecking=accept-new root@"$ip" bash -s <<< "$script"; then
+    ssh -i "$TEMP_SSH_KEY" \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=10 \
+        -o ServerAliveInterval=5 \
+        -o ServerAliveCountMax=6 \
+        root@"$ip" bash -s <<< "$script"
+    local rc=$?
+
+    if [[ "$rc" -eq 0 ]]; then
         return 0
     fi
 
-    rc=$?
+    # SSH exit code 255 means connection closed/reset - expected during reboot
     if [[ "$rc" -eq 255 ]]; then
         return 0
     fi
@@ -129,155 +196,173 @@ run_remote_disconnect_ok() {
     return "$rc"
 }
 
+ensure_rescue_mode() {
+    local ip="$1"
+    echo "==> Verifying we are in Hetzner rescue environment..."
+    run_remote "$ip" "
+set -euo pipefail
+ROOT_SRC=\$(findmnt -n -o SOURCE / || true)
+echo Root filesystem source: \$ROOT_SRC
+if [[ \$ROOT_SRC == /dev/sda* ]]; then
+  echo 'Error: not in rescue mode (root on /dev/sda).' >&2
+  cat /etc/os-release || true
+  exit 1
+fi
+"
+}
+
 # ----- Main Logic -----
 
-# Cleanup function to ensure server and SSH key deletion on exit
 cleanup() {
     if [[ -n "${SERVER_ID:-}" ]]; then
-        echo "==> Cleaning up server $SERVER_ID..."
-        hcloud_api DELETE "servers/${SERVER_ID}" || echo "Warning: Failed to delete server $SERVER_ID"
+        echo "==> Cleaning up server..."
+        hcloud_api DELETE "servers/${SERVER_ID}" || echo "Warning: Failed to delete server"
     fi
     if [[ -n "${SSH_KEY_ID:-}" ]]; then
-        echo "==> Cleaning up SSH key $SSH_KEY_ID..."
-        hcloud_api DELETE "ssh_keys/${SSH_KEY_ID}" || echo "Warning: Failed to delete SSH key $SSH_KEY_ID"
+        echo "==> Cleaning up SSH key..."
+        hcloud_api DELETE "ssh_keys/${SSH_KEY_ID}" || echo "Warning: Failed to delete SSH key"
     fi
-    if [[ -n "${TEMP_SSH_KEY:-}" && -f "${TEMP_SSH_KEY}" ]]; then
-        echo "==> Cleaning up temporary SSH key files..."
-        rm -f "${TEMP_SSH_KEY}" "${TEMP_SSH_KEY}.pub"
+    if [[ -n "${TEMP_SSH_KEY:-}" ]]; then
+        rm -f "${TEMP_SSH_KEY}" "${TEMP_SSH_KEY}.pub" 2>/dev/null || true
     fi
 }
 
-# Set up cleanup trap early
 trap cleanup EXIT
 
-echo "==> [1/9] Creating temporary SSH key..."
-TEMP_SSH_KEY=$(tr -dc A-Za-z0-9 </dev/urandom | head -c 5 ; echo '')
-ssh-keygen -t ed25519 -f "$TEMP_SSH_KEY" -N "" -C "temp-microos-${ARCH}-$$"
+echo "==> [1/6] Creating temporary SSH key..."
+TEMP_SSH_KEY="/tmp/temp-microos-${ARCH}-$(openssl rand -hex 6)"
+ssh-keygen -t ed25519 -f "$TEMP_SSH_KEY" -N "" -C "temp-microos-${ARCH}-$$" >/dev/null
 SSH_PUB_KEY=$(cat "${TEMP_SSH_KEY}.pub")
 
-echo "==> [2/9] Uploading SSH key to Hetzner..."
+echo "==> [2/6] Uploading SSH key to Hetzner..."
 SSH_KEY_RESPONSE=$(hcloud_api POST "ssh_keys" -d "{
     \"name\": \"temp-microos-${ARCH}-$$\",
     \"public_key\": \"${SSH_PUB_KEY}\"
 }")
 SSH_KEY_ID=$(echo "$SSH_KEY_RESPONSE" | jq -r '.ssh_key.id')
-echo "SSH Key ID: $SSH_KEY_ID"
+echo "SSH key ID: $SSH_KEY_ID"
 
-echo "==> [3/9] Creating server ($SERVER_TYPE, ARCH=$ARCH, Rescue=linux64)..."
+echo "==> [3/6] Creating server ($SERVER_TYPE, $ARCH)..."
 CREATE_RESPONSE=$(hcloud_api POST "servers" -d "{
     \"name\": \"temp-microos-${ARCH}-$$\",
     \"server_type\": \"$SERVER_TYPE\",
-    \"image\": \"ubuntu-22.04\",
+    \"image\": \"ubuntu-24.04\",
     \"location\": \"fsn1\",
     \"ssh_keys\": [${SSH_KEY_ID}],
-    \"rescue\": \"linux64\",
-    \"start_after_create\": true
+    \"start_after_create\": false,
+    \"public_net\": {
+        \"enable_ipv4\": true,
+        \"enable_ipv6\": false
+    }
 }")
 
 SERVER_ID=$(echo "$CREATE_RESPONSE" | jq -r '.server.id')
 SERVER_IP=$(echo "$CREATE_RESPONSE" | jq -r '.server.public_net.ipv4.ip')
 ACTION_ID=$(echo "$CREATE_RESPONSE" | jq -r '.action.id')
 
-echo "Server ID: $SERVER_ID, IP: $SERVER_IP"
+echo "Server ID: $SERVER_ID"
+echo "Server IP: $SERVER_IP"
+
 wait_for_action "$ACTION_ID"
 
+echo "==> [4/6] Enabling rescue mode (linux64)..."
+RESCUE_RESPONSE=$(hcloud_api POST "servers/${SERVER_ID}/actions/enable_rescue" -d "{
+    \"type\": \"linux64\",
+    \"ssh_keys\": [${SSH_KEY_ID}]
+}")
+RESCUE_ACTION_ID=$(echo "$RESCUE_RESPONSE" | jq -r '.action.id')
+wait_for_action "$RESCUE_ACTION_ID"
+
+echo "==> Powering on server into rescue system..."
+POWERON_RESPONSE=$(hcloud_api POST "servers/${SERVER_ID}/actions/poweron")
+POWERON_ACTION_ID=$(echo "$POWERON_RESPONSE" | jq -r '.action.id')
+wait_for_action "$POWERON_ACTION_ID"
+
 wait_for_ssh "$SERVER_IP"
+ensure_rescue_mode "$SERVER_IP"
 
-echo "==> [4/9] Downloading MicroOS image..."
-run_remote "$SERVER_IP" "wget --timeout=5 --waitretry=5 --tries=5 --retry-connrefused --inet4-only ${MICROOS_URL}"
+echo "==> [4/6] Downloading and writing MicroOS image..."
+echo "==> Disabling rescue mode for next boot..."
+DISABLE_RESCUE_RESPONSE=$(hcloud_api POST "servers/${SERVER_ID}/actions/disable_rescue")
+DISABLE_RESCUE_ACTION_ID=$(echo "$DISABLE_RESCUE_RESPONSE" | jq -r '.action.id')
+wait_for_action "$DISABLE_RESCUE_ACTION_ID"
 
-echo "==> [5/9] Installing qemu-img and writing image to disk..."
-# shellcheck disable=SC2016
-run_remote "$SERVER_IP" 'set -e
-    echo "Installing qemu-utils..."
-    apt-get update -qq
-    apt-get install -y -qq qemu-utils
-    
-    echo "Writing MicroOS image to temporary location..."
-    qemu-img convert -p -f qcow2 -O raw $(ls -a | grep -ie '"'"'^opensuse.*microos.*qcow2$'"'"') /tmp/microos.raw
-    
-    echo "Setting up loop device for the image..."
-    LOOP_DEVICE=$(losetup -f --show -P /tmp/microos.raw)
-    echo "Loop device: $LOOP_DEVICE"
-    
-    # Wait for partition device nodes and probe partitions
-    sleep 2
-    partprobe "$LOOP_DEVICE" || true
-    sleep 1
-    
-    # List available partitions
-    ls -la "${LOOP_DEVICE}"* || true
-    lsblk "$LOOP_DEVICE" || true
-    
-    # Try to find the root partition (usually p3 or p2)
-    ROOT_PART=""
-    if [ -e "${LOOP_DEVICE}p3" ]; then
-        ROOT_PART="${LOOP_DEVICE}p3"
-    elif [ -e "${LOOP_DEVICE}p2" ]; then
-        ROOT_PART="${LOOP_DEVICE}p2"
-    else
-        echo "ERROR: Cannot find root partition"
-        losetup -d "$LOOP_DEVICE"
-        exit 1
-    fi
-    
-    echo "Mounting root partition: $ROOT_PART"
-    mkdir -p /mnt/microos
-    mount "$ROOT_PART" /mnt/microos
-    
-    echo "Injecting SSH key..."
-    mkdir -p /mnt/microos/root/.ssh
-    chmod 700 /mnt/microos/root/.ssh
-    cat ~/.ssh/authorized_keys > /mnt/microos/root/.ssh/authorized_keys
-    chmod 600 /mnt/microos/root/.ssh/authorized_keys
-    
-    echo "Cleaning up..."
-    umount /mnt/microos
-    losetup -d "$LOOP_DEVICE"
-    
-    echo "Writing modified image to disk..."
-    dd if=/tmp/microos.raw of=/dev/sda bs=4M status=progress
-    sync
-    
-    echo "Image written successfully"
-'
+run_remote_disconnect_ok "$SERVER_IP" "
+set -ex
+echo 'Downloading MicroOS image...'
+wget --timeout=5 --waitretry=5 --tries=5 --retry-connrefused --inet4-only '$MICROOS_URL'
 
-echo "==> [5.5/9] Rebooting into MicroOS (Expect disconnection)..."
-run_remote_disconnect_ok "$SERVER_IP" 'echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger || reboot -f'
+echo 'Installing qemu-utils...'
+apt-get update -qq
+apt-get install -y -qq qemu-utils
 
-echo "Waiting for reboot to complete..."
-sleep 30
-wait_for_ssh "$SERVER_IP"
+echo 'Validating rescue environment...'
+ROOT_SRC=\$(findmnt -n -o SOURCE / || true)
+echo Root filesystem source: \$ROOT_SRC
+if [[ \$ROOT_SRC == /dev/sda* ]]; then
+  echo 'Error: root filesystem is on /dev/sda; refusing to overwrite disk outside rescue mode.' >&2
+  cat /etc/os-release || true
+  exit 1
+fi
 
-echo "==> [6/9] Installing packages (expect disconnect)..."
-run_remote_disconnect_ok "$SERVER_IP" "set -ex
-transactional-update --continue pkg install -y ${PACKAGES_STR}
-transactional-update --continue shell <<-EOF
-    setenforce 0
-    rpm --import https://rpm.rancher.io/public.key
-    zypper install -y https://github.com/k3s-io/k3s-selinux/releases/download/v1.6.stable.1/k3s-selinux-1.6-1.sle.noarch.rpm
-    zypper addlock k3s-selinux
-    restorecon -Rv /etc/selinux/targeted/policy
-    restorecon -Rv /var/lib
-    setenforce 1
-EOF
-echo \"Packages installed, rebooting...\"
+echo 'Converting and writing image to disk...'
+qemu-img convert -p -t directsync -f qcow2 -O host_device \$(ls -1 | grep -E '^openSUSE.*MicroOS.*\.qcow2$') /dev/sda
+
+echo 'Done. Rebooting into MicroOS...'
 sleep 1 && udevadm settle && reboot
 "
 
-sleep 5
-wait_for_ssh "$SERVER_IP"
+echo "Waiting for reboot to complete..."
+wait_for_reboot_cycle "$SERVER_IP"
 
-echo "==> [7/9] Cleaning up..."
-run_remote "$SERVER_IP" 'set -ex
-    rm -rf /etc/ssh/ssh_host_*
-    echo "Make sure to use Network Manager"
-    mkdir -p /etc/NetworkManager
-    touch /etc/NetworkManager/NetworkManager.conf
-    sleep 1 && udevadm settle
-'
+echo "==> [5/6] Installing packages and K3s SELinux..."
+run_remote_disconnect_ok "$SERVER_IP" "
+set -ex
 
-echo "==> [8/9] Creating snapshot..."
+if ! command -v transactional-update >/dev/null 2>&1; then
+  echo 'Error: transactional-update not found; host may still be in rescue mode.' >&2
+  cat /etc/os-release || true
+  exit 1
+fi
+
+echo 'Installing packages via transactional-update...'
+transactional-update --continue pkg install -y $PACKAGES_STR
+
+transactional-update --continue shell <<'TRANSACTIONAL_EOF'
+set -ex
+setenforce 0
+rpm --import https://rpm.rancher.io/public.key
+zypper install -y https://github.com/k3s-io/k3s-selinux/releases/download/v1.6.stable.1/k3s-selinux-1.6-1.sle.noarch.rpm
+zypper addlock k3s-selinux
+restorecon -Rv /etc/selinux/targeted/policy
+restorecon -Rv /var/lib
+setenforce 1
+TRANSACTIONAL_EOF
+
+echo 'Packages installed. Rebooting...'
+sleep 1
+udevadm settle
+reboot
+"
+
+echo "Waiting for reboot to complete..."
+wait_for_reboot_cycle "$SERVER_IP"
+
+echo "==> [6/6] Cleaning up and creating snapshot..."
+run_remote "$SERVER_IP" "
+set -ex
+echo 'Cleaning up SSH host keys...'
+rm -rf /etc/ssh/ssh_host_*
+
+echo 'Ensuring NetworkManager is configured...'
+mkdir -p /etc/NetworkManager
+touch /etc/NetworkManager/NetworkManager.conf
+
+udevadm settle
+echo 'Cleanup complete.'
+"
+
+echo "Creating snapshot: $SNAPSHOT_NAME..."
 SNAPSHOT_RESPONSE=$(hcloud_api POST "servers/${SERVER_ID}/actions/create_image" -d "{
     \"description\": \"${SNAPSHOT_NAME}\",
     \"type\": \"snapshot\",
@@ -285,7 +370,7 @@ SNAPSHOT_RESPONSE=$(hcloud_api POST "servers/${SERVER_ID}/actions/create_image" 
         \"arch\": \"${ARCH}\",
         \"os\": \"microos\",
         \"k3s\": \"true\",
-        \"microos-snapshot\": \"true\"
+        \"microos-snapshot\": \"yes\"
     }
 }")
 
@@ -293,10 +378,13 @@ SNAPSHOT_ACTION_ID=$(echo "$SNAPSHOT_RESPONSE" | jq -r '.action.id')
 wait_for_action "$SNAPSHOT_ACTION_ID"
 
 SNAPSHOT_ID=$(echo "$SNAPSHOT_RESPONSE" | jq -r '.image.id')
-echo "Snapshot created: ID=$SNAPSHOT_ID, Name=$SNAPSHOT_NAME"
+echo ""
+echo "=========================================="
+echo "SUCCESS!"
+echo "=========================================="
+echo "Snapshot created: $SNAPSHOT_NAME"
+echo "Snapshot ID: $SNAPSHOT_ID"
+echo "Arch: $ARCH"
+echo "=========================================="
 
-echo "==> [9/9] Cleaning up server..."
-trap - EXIT  # Disable trap since we're cleaning up manually
-hcloud_api DELETE "servers/${SERVER_ID}"
-
-echo "==> Done. Snapshot '${SNAPSHOT_NAME}' (ID: ${SNAPSHOT_ID}) is ready for use."
+# Cleanup trap will delete the server

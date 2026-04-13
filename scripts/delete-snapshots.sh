@@ -30,7 +30,8 @@ hcloud_api() {
 
 # --- Main Logic ---
 echo "==> [1/2] Fetching snapshots..."
-SNAPSHOTS=$(hcloud_api GET "images?type=snapshot&label_selector=microos-snapshot%3Dtrue&sort=created:desc")
+# Match snapshots created by create-snapshots.sh (label microos-snapshot="yes")
+SNAPSHOTS=$(hcloud_api GET "images?type=snapshot&label_selector=microos-snapshot%3Dyes&sort=created:desc")
 
 TOTAL=$(echo "$SNAPSHOTS" | jq '.images | length')
 echo "  Found ${TOTAL} snapshot(s) total."
@@ -61,7 +62,7 @@ for ARCH in "x86" "arm64"; do
 
     echo "  Snapshots to keep:"
     echo "$ARCH_SNAPSHOTS" | jq --argjson keep "$KEEP_LAST" '
-        .[:$keep] | "   [KEEP] id=\(.id) name=\(.description) created=\(.created)"
+        .[:$keep][] | "   [KEEP] id=\(.id) name=\(.description) created=\(.created)"
     '
 
     echo "  Snapshots to delete (${DELETE_COUNT}):"
